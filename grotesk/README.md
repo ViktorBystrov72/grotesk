@@ -9,7 +9,6 @@ ML медиа сервис который:
 - поддерживает пользовательский и административный контур
 - закладывает основу под REST API, Web UI, очереди, воркеры и дальнейшую реализацию.
 
-
 ## Идея сервиса
 
 Сервис будет написан по принципам ООП и даже в какой-то мере по DDD
@@ -343,7 +342,6 @@ grotesk/
         ├── infrastructure/
         └── presentation/
 
-
 ## Пример жизненного цикла аудио-задачи
 
 1. Пользователь загружает аудиофайл.
@@ -365,3 +363,65 @@ grotesk/
 6. Воркеры выполняют операции по таймкодам.
 7. Результат сохраняется как VideoEditResult.
 8. При успехе транзакция подтверждается и история обновляется.
+
+## Структура проекта
+
+text
+grotesk/
+├── .env
+├── README.md
+├── docker-compose.yml
+├── pyproject.toml
+├── app/
+│   ├── Dockerfile
+│   └── src/
+│       └── server.py
+├── web-proxy/
+│   ├── Dockerfile
+│   └── nginx.conf
+├── rabbitmq/
+│   └── data/
+│       └── .gitkeep
+├── database/
+│   └── data/
+│       └── .gitkeep
+└── src/
+    └── grotesk/
+        ├── application/
+        ├── domain/
+        ├── infrastructure/
+        ├── main/
+        └── presentation/
+
+
+## Запуск проекта
+
+Сборка:
+
+```bash
+docker compose build
+```
+
+Запуск:
+```bash
+docker compose up
+```
+
+Запуск в фоне:
+```bash
+docker compose up -d
+```
+
+Остановка:
+
+```bash
+docker compose down
+```
+
+## Проверка
+
+После запуска должны быть доступны:
+
+- http://localhost/
+- http://localhost/health
+- http://localhost:15672
