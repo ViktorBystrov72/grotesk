@@ -29,7 +29,7 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     volumes:
-      - ./rabbitmq/data:/var/lib/rabbitmq
+      - rabbitmq_data:/var/lib/rabbitmq
 
   database:
     image: postgres:16-alpine
@@ -38,4 +38,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - ./database/data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  rabbitmq_data:
+  postgres_data:

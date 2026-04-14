@@ -379,12 +379,6 @@ grotesk/
 ├── web-proxy/
 │   ├── Dockerfile
 │   └── nginx.conf
-├── rabbitmq/
-│   └── data/
-│       └── .gitkeep
-├── database/
-│   └── data/
-│       └── .gitkeep
 └── src/
     └── grotesk/
         ├── application/
