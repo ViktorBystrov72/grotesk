@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from grotesk.domain.catalog.model import ModelId
@@ -37,7 +37,7 @@ class JobResultRef(ValueObject):
 @dataclass
 class JobHistoryRecord(Entity):
     status: ProcessingStatus
-    changed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    changed_at: datetime | None = None
     message: str = ""
 
 
@@ -50,6 +50,7 @@ class ProcessingJob(Entity):
     job_type: JobType
     estimated_cost: Money
     status: ProcessingStatus = ProcessingStatus.PENDING
+    created_at: datetime | None = None
     result_ref: JobResultRef | None = None
     history: list[JobHistoryRecord] = field(default_factory=list)
 

@@ -126,6 +126,7 @@ def processing_job_to_domain(model: ProcessingJobModel) -> ProcessingJob:
         job_type=model.job_type,
         estimated_cost=Money(model.estimated_cost_amount, model.estimated_cost_currency),
         status=model.status,
+        created_at=model.created_at,
         result_ref=result_ref,
         history=[history_record_to_domain(record) for record in model.history],
     )

@@ -48,7 +48,7 @@ async def seed_demo_data(session_factory: async_sessionmaker[AsyncSession]) -> N
         demo_user = await user_repository.get_by_email(Email("demo@grotesk.local"))
         if demo_user is None:
             demo_user_id = UserId(uuid4())
-            await app["register_user"](
+            await app.register_user(
                 RegisterUser(
                     user_id=demo_user_id,
                     email="demo@grotesk.local",
@@ -61,7 +61,7 @@ async def seed_demo_data(session_factory: async_sessionmaker[AsyncSession]) -> N
         demo_admin = await user_repository.get_by_email(Email("admin@grotesk.local"))
         if demo_admin is None:
             demo_admin_id = UserId(uuid4())
-            await app["register_user"](
+            await app.register_user(
                 RegisterUser(
                     user_id=demo_admin_id,
                     email="admin@grotesk.local",
@@ -74,12 +74,12 @@ async def seed_demo_data(session_factory: async_sessionmaker[AsyncSession]) -> N
         if demo_user is not None:
             demo_user_balance = await account_balance_repository.get_by_user_id(demo_user.id)
             if demo_user_balance is not None and demo_user_balance.available.amount == Decimal("0"):
-                await app["top_up_balance"](TopUpBalance(user_id=demo_user.id, amount=Money(Decimal("100"))))
+                await app.top_up_balance(TopUpBalance(user_id=demo_user.id, amount=Money(Decimal("100"))))
 
         if demo_admin is not None:
             demo_admin_balance = await account_balance_repository.get_by_user_id(demo_admin.id)
             if demo_admin_balance is not None and demo_admin_balance.available.amount == Decimal("0"):
-                await app["top_up_balance"](TopUpBalance(user_id=demo_admin.id, amount=Money(Decimal("500"))))
+                await app.top_up_balance(TopUpBalance(user_id=demo_admin.id, amount=Money(Decimal("500"))))
 
         default_models = [
             ModelProfile(

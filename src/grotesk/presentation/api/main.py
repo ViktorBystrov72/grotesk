@@ -3,8 +3,8 @@ from typing import Callable
 
 from fastapi import FastAPI
 
-from grotesk.presentation.api.routers import setup_routers
 from grotesk.presentation.api.exceptions import setup_exception_handlers
+from grotesk.presentation.api.routers import setup_routers
 
 
 def create_app(lifespan: Callable[[FastAPI], AsyncGenerator] | None = None) -> FastAPI:

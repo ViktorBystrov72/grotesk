@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -77,7 +77,7 @@ class BillingTransactionModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(UTC),
+        server_default=sa.func.now(),
     )
     related_job_id: Mapped[UUID | None] = mapped_column(sa.Uuid(as_uuid=True), nullable=True)
 
@@ -211,6 +211,11 @@ class ProcessingJobModel(Base):
         sa.Enum(ProcessingStatus, native_enum=False),
         nullable=False,
     )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
+    )
     result_type: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
     result_id: Mapped[UUID | None] = mapped_column(sa.Uuid(as_uuid=True), nullable=True)
 
@@ -235,7 +240,7 @@ class JobHistoryRecordModel(Base):
     changed_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(UTC),
+        server_default=sa.func.now(),
     )
     message: Mapped[str] = mapped_column(sa.Text, nullable=False, default="")
 

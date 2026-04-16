@@ -16,7 +16,7 @@ from grotesk.application.processing.commands import (
     SubmitTranscriptionJobHandler,
     SubmitVideoEditingJobHandler,
 )
-from grotesk.application.processing.queries import GetJobHistoryHandler
+from grotesk.application.processing.queries import GetUserJobHistoryHandler
 from grotesk.domain.billing.service import BillingService
 from grotesk.domain.media_ingestion.service import MediaIngestionService
 from grotesk.infrastructure.db.repositories.billing import (
@@ -30,9 +30,10 @@ from grotesk.infrastructure.db.repositories.processing import ProcessingJobRepos
 from grotesk.infrastructure.db.repositories.user import UserRepositoryImpl
 from grotesk.infrastructure.db.uow import SQLAlchemyUnitOfWork
 from grotesk.infrastructure.stubs import InMemoryEventPublisher
+from grotesk.main.application import Application
 
 
-def build_application(session: AsyncSession) -> dict[str, object]:
+def build_application(session: AsyncSession) -> Application:
     user_repository = UserRepositoryImpl(session)
     account_balance_repository = AccountBalanceRepositoryImpl(session)
     top_up_request_repository = TopUpRequestRepositoryImpl(session)
@@ -51,12 +52,12 @@ def build_application(session: AsyncSession) -> dict[str, object]:
     )
     media_ingestion_service = MediaIngestionService(media_asset_repository)
 
-    return {
-        "register_user": RegisterUserHandler(user_repository, billing_service, publisher, uow),
-        "get_user_by_id": GetUserByIdHandler(user_repository),
-        "get_user_by_email": GetUserByEmailHandler(user_repository),
-        "upload_media": UploadMediaAssetHandler(media_ingestion_service, publisher, uow),
-        "submit_transcription_job": SubmitTranscriptionJobHandler(
+    return Application(
+        register_user=RegisterUserHandler(user_repository, billing_service, publisher, uow),
+        get_user_by_id=GetUserByIdHandler(user_repository),
+        get_user_by_email=GetUserByEmailHandler(user_repository),
+        upload_media=UploadMediaAssetHandler(media_ingestion_service, publisher, uow),
+        submit_transcription_job=SubmitTranscriptionJobHandler(
             processing_job_repository,
             media_asset_repository,
             model_catalog_repository,
@@ -64,7 +65,7 @@ def build_application(session: AsyncSession) -> dict[str, object]:
             publisher,
             uow,
         ),
-        "submit_video_edit_job": SubmitVideoEditingJobHandler(
+        submit_video_edit_job=SubmitVideoEditingJobHandler(
             processing_job_repository,
             media_asset_repository,
             model_catalog_repository,
@@ -72,10 +73,10 @@ def build_application(session: AsyncSession) -> dict[str, object]:
             publisher,
             uow,
         ),
-        "approve_top_up": ApproveTopUpHandler(billing_service, publisher, uow),
-        "top_up_balance": TopUpBalanceHandler(billing_service, publisher, uow),
-        "debit_balance": DebitBalanceHandler(billing_service, publisher, uow),
-        "get_user_transaction_history": GetUserTransactionHistoryHandler(billing_transaction_repository),
-        "get_user_balance": GetUserBalanceHandler(account_balance_repository),
-        "get_job_history": GetJobHistoryHandler(processing_job_repository),
-    }
+        approve_top_up=ApproveTopUpHandler(billing_service, publisher, uow),
+        top_up_balance=TopUpBalanceHandler(billing_service, publisher, uow),
+        debit_balance=DebitBalanceHandler(billing_service, publisher, uow),
+        get_user_transaction_history=GetUserTransactionHistoryHandler(billing_transaction_repository),
+        get_user_balance=GetUserBalanceHandler(account_balance_repository),
+        get_user_job_history=GetUserJobHistoryHandler(processing_job_repository),
+    )

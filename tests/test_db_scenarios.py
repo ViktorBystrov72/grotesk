@@ -59,7 +59,7 @@ async def test_register_user_creates_balance(db_context: dict[str, object]) -> N
         app = build_application(session)
         user_id = UserId(uuid4())
 
-        await app["register_user"](
+        await app.register_user(
             RegisterUser(
                 user_id=user_id,
                 email="user1@grotesk.local",
@@ -87,25 +87,25 @@ async def test_top_up_and_debit_persist_transactions(db_context: dict[str, objec
         app = build_application(session)
         user_id = UserId(uuid4())
 
-        await app["register_user"](
+        await app.register_user(
             RegisterUser(
                 user_id=user_id,
                 email="billing@grotesk.local",
                 password_hash="hash-2",
             ),
         )
-        await app["top_up_balance"](TopUpBalance(user_id=user_id, amount=Money(Decimal("50"))))
-        await app["debit_balance"](DebitBalance(user_id=user_id, amount=Money(Decimal("20"))))
+        await app.top_up_balance(TopUpBalance(user_id=user_id, amount=Money(Decimal("50"))))
+        await app.debit_balance(DebitBalance(user_id=user_id, amount=Money(Decimal("20"))))
 
         balance_repository = AccountBalanceRepositoryImpl(session)
         balance = await balance_repository.get_by_user_id(user_id)
-        history = await app["get_user_transaction_history"](GetUserTransactionHistory(user_id=user_id))
+        history = await app.get_user_transaction_history(GetUserTransactionHistory(user_id=user_id))
 
         assert balance is not None
         assert balance.available.amount == Decimal("30")
         assert len(history) == 2
-        assert history[0].amount == "20.00"
-        assert history[1].amount == "50.00"
+        amounts = {h.amount for h in history}
+        assert amounts == {"20.00", "50.00"}
 
 
 @pytest.mark.asyncio

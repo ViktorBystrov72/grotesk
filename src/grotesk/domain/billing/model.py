@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from grotesk.domain.common.entity import Entity
@@ -37,7 +37,7 @@ class BillingTransaction(Entity):
     user_id: UserId
     amount: Money
     transaction_type: TransactionType
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime | None = None
     related_job_id: JobId | None = None
 
 

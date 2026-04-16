@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from grotesk.main.application import Application
 from grotesk.main.bootstrap import build_application
 
 
@@ -15,5 +16,5 @@ async def get_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
 
 async def get_application(
     session: Annotated[AsyncSession, Depends(get_session)],
-) -> dict[str, object]:
+) -> Application:
     return build_application(session)

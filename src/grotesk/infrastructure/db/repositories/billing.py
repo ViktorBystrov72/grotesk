@@ -111,7 +111,6 @@ class BillingTransactionRepositoryImpl(SQLAlchemyRepository, BillingTransactionR
                 amount=transaction.amount.amount,
                 currency=transaction.amount.currency,
                 transaction_type=transaction.transaction_type,
-                created_at=transaction.created_at,
                 related_job_id=transaction.related_job_id.value if transaction.related_job_id else None,
             ),
         )

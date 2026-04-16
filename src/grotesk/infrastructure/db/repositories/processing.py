@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from grotesk.domain.identity_access.model import UserId
 from grotesk.domain.processing.interfaces import ProcessingJobRepository
 from grotesk.domain.processing.model import JobId, ProcessingJob
 from grotesk.infrastructure.db.mappers import processing_job_to_domain
@@ -25,7 +26,6 @@ class ProcessingJobRepositoryImpl(SQLAlchemyRepository, ProcessingJobRepository)
         model.history = [
             JobHistoryRecordModel(
                 status=record.status,
-                changed_at=record.changed_at,
                 message=record.message,
             )
             for record in job.history
@@ -42,6 +42,17 @@ class ProcessingJobRepositoryImpl(SQLAlchemyRepository, ProcessingJobRepository)
         if model is None:
             return None
         return processing_job_to_domain(model)
+
+    async def list_by_user_id(self, user_id: UserId) -> list[ProcessingJob]:
+        models = (
+            await self._session.scalars(
+                select(ProcessingJobModel)
+                .options(selectinload(ProcessingJobModel.history))
+                .where(ProcessingJobModel.user_id == user_id.value)
+                .order_by(ProcessingJobModel.created_at.desc()),
+            )
+        ).all()
+        return [processing_job_to_domain(model) for model in models]
 
     async def save(self, job: ProcessingJob) -> None:
         model = await self._session.scalar(
@@ -65,7 +76,6 @@ class ProcessingJobRepositoryImpl(SQLAlchemyRepository, ProcessingJobRepository)
         model.history = [
             JobHistoryRecordModel(
                 status=record.status,
-                changed_at=record.changed_at,
                 message=record.message,
             )
             for record in job.history
