@@ -7,5 +7,6 @@ from grotesk.domain.identity_access.model import UserId, UserRole
 class UserDTO:
     user_id: UserId
     email: str
+    password_hash: str
     role: UserRole
     is_active: bool

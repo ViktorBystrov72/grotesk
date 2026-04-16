@@ -446,3 +446,8 @@ docker compose down
 source venv/bin/activate
 make test
 ```
+
+Установить зависимости
+```bash
+pip install -e .
+```

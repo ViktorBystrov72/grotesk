@@ -5,9 +5,12 @@ from grotesk.application.billing.commands import (
     DebitBalanceHandler,
     TopUpBalanceHandler,
 )
-from grotesk.application.billing.queries import GetUserTransactionHistoryHandler
+from grotesk.application.billing.queries import (
+    GetUserBalanceHandler,
+    GetUserTransactionHistoryHandler,
+)
 from grotesk.application.identity_access.commands import RegisterUserHandler
-from grotesk.application.identity_access.queries import GetUserByIdHandler
+from grotesk.application.identity_access.queries import GetUserByEmailHandler, GetUserByIdHandler
 from grotesk.application.media_ingestion.commands import UploadMediaAssetHandler
 from grotesk.application.processing.commands import (
     SubmitTranscriptionJobHandler,
@@ -51,6 +54,7 @@ def build_application(session: AsyncSession) -> dict[str, object]:
     return {
         "register_user": RegisterUserHandler(user_repository, billing_service, publisher, uow),
         "get_user_by_id": GetUserByIdHandler(user_repository),
+        "get_user_by_email": GetUserByEmailHandler(user_repository),
         "upload_media": UploadMediaAssetHandler(media_ingestion_service, publisher, uow),
         "submit_transcription_job": SubmitTranscriptionJobHandler(
             processing_job_repository,
@@ -72,5 +76,6 @@ def build_application(session: AsyncSession) -> dict[str, object]:
         "top_up_balance": TopUpBalanceHandler(billing_service, publisher, uow),
         "debit_balance": DebitBalanceHandler(billing_service, publisher, uow),
         "get_user_transaction_history": GetUserTransactionHistoryHandler(billing_transaction_repository),
+        "get_user_balance": GetUserBalanceHandler(account_balance_repository),
         "get_job_history": GetJobHistoryHandler(processing_job_repository),
     }

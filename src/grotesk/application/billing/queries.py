@@ -2,8 +2,24 @@ from dataclasses import dataclass
 
 from grotesk.application.billing.dto import BillingTransactionDTO
 from grotesk.application.common.query import Query, QueryHandler
-from grotesk.domain.billing.interfaces import BillingTransactionRepository
+from grotesk.domain.billing.interfaces import AccountBalanceRepository, BillingTransactionRepository
 from grotesk.domain.identity_access.model import UserId
+
+
+@dataclass(frozen=True)
+class GetUserBalance(Query[str]):
+    user_id: UserId
+
+
+class GetUserBalanceHandler(QueryHandler[GetUserBalance, str]):
+    def __init__(self, account_balance_repository: AccountBalanceRepository) -> None:
+        self._account_balance_repository = account_balance_repository
+
+    async def __call__(self, query: GetUserBalance) -> str:
+        balance = await self._account_balance_repository.get_by_user_id(query.user_id)
+        if balance is None:
+            raise ValueError("Balance not found.")
+        return str(balance.available.amount)
 
 
 @dataclass(frozen=True)
