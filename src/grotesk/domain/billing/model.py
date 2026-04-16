@@ -69,6 +69,11 @@ class AccountBalance(Entity):
     def top_up(self, amount: Money) -> None:
         self.available = Money(self.available.amount + amount.amount, self.available.currency)
 
+    def debit(self, amount: Money) -> None:
+        if not self.can_reserve(amount):
+            raise ValueError("Insufficient balance for debit.")
+        self.available = Money(self.available.amount - amount.amount, self.available.currency)
+
 
 @dataclass
 class TopUpRequest(Entity):

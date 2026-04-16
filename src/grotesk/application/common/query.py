@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-
 QueryResultT = TypeVar("QueryResultT")
 QueryT = TypeVar("QueryT")
 

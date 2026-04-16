@@ -2,9 +2,17 @@ from dataclasses import dataclass
 
 from grotesk.application.common.command import Command, CommandHandler
 from grotesk.application.common.interfaces import EventPublisher, UnitOfWork
+from grotesk.domain.billing.service import BillingService
 from grotesk.domain.identity_access.events import UserRegistered
 from grotesk.domain.identity_access.interfaces import UserRepository
-from grotesk.domain.identity_access.model import Credential, Email, PasswordHash, User, UserId, UserRole
+from grotesk.domain.identity_access.model import (
+    Credential,
+    Email,
+    PasswordHash,
+    User,
+    UserId,
+    UserRole,
+)
 
 
 @dataclass(frozen=True)
@@ -16,8 +24,15 @@ class RegisterUser(Command[UserId]):
 
 
 class RegisterUserHandler(CommandHandler[RegisterUser, UserId]):
-    def __init__(self, user_repository: UserRepository, publisher: EventPublisher, uow: UnitOfWork) -> None:
+    def __init__(
+        self,
+        user_repository: UserRepository,
+        billing_service: BillingService,
+        publisher: EventPublisher,
+        uow: UnitOfWork,
+    ) -> None:
         self._user_repository = user_repository
+        self._billing_service = billing_service
         self._publisher = publisher
         self._uow = uow
 
@@ -33,6 +48,7 @@ class RegisterUserHandler(CommandHandler[RegisterUser, UserId]):
             role=command.role,
         )
         await self._user_repository.add(user)
+        await self._billing_service.create_account(user.id)
         await self._publisher.publish([UserRegistered(user_id=user.id, role=user.role)])
         await self._uow.commit()
         return user.id

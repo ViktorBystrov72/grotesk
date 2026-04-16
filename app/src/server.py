@@ -1,6 +1,11 @@
+import asyncio
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from grotesk.infrastructure.db.config import DBConfig
+from grotesk.infrastructure.db.init_data import initialize_database
+from grotesk.infrastructure.db.session import build_engine, build_session_factory
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -36,6 +41,12 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    db_config = DBConfig.from_env()
+    engine = build_engine(db_config)
+    session_factory = build_session_factory(engine)
+    asyncio.run(initialize_database(engine, session_factory))
+    asyncio.run(engine.dispose())
+
     host = os.getenv("APP_HOST", "0.0.0.0")
     port = int(os.getenv("APP_PORT", "8000"))
     server = ThreadingHTTPServer((host, port), RequestHandler)

@@ -24,8 +24,5 @@ class GetJobHistoryHandler(QueryHandler[GetJobHistory, ProcessingJobDTO]):
             job_id=job.id,
             job_type=job.job_type,
             status=job.status,
-            history=[
-                JobHistoryItemDTO(status=record.status, message=record.message)
-                for record in job.history
-            ],
+            history=[JobHistoryItemDTO(status=record.status, message=record.message) for record in job.history],
         )

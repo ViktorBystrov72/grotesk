@@ -5,8 +5,11 @@ services:
     build: ./app
     env_file:
       - .env
+    environment:
+      PYTHONPATH: /workspace/src:/app/src
     volumes:
       - ./app/src:/app/src
+      - ./src:/workspace/src
     depends_on:
       - rabbitmq
       - database

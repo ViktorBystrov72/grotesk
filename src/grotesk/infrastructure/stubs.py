@@ -1,4 +1,10 @@
-from grotesk.domain.billing.model import AccountBalance, TopUpRequest, TopUpRequestId
+from grotesk.domain.billing.model import (
+    AccountBalance,
+    BillingTransaction,
+    TopUpRequest,
+    TopUpRequestId,
+    TransactionId,
+)
 from grotesk.domain.catalog.model import ModelId, ModelProfile
 from grotesk.domain.common.event import Event
 from grotesk.domain.identity_access.model import Email, User, UserId
@@ -8,6 +14,9 @@ from grotesk.domain.processing.model import JobId, ProcessingJob
 
 class InMemoryUnitOfWork:
     async def commit(self) -> None:
+        return None
+
+    async def rollback(self) -> None:
         return None
 
 
@@ -56,6 +65,24 @@ class InMemoryTopUpRequestRepository:
 
     async def get_by_id(self, request_id: TopUpRequestId) -> TopUpRequest | None:
         return self._requests.get(str(request_id.value))
+
+    async def save(self, request: TopUpRequest) -> None:
+        self._requests[str(request.id.value)] = request
+
+
+class InMemoryBillingTransactionRepository:
+    def __init__(self) -> None:
+        self._transactions: dict[str, BillingTransaction] = {}
+
+    async def add(self, transaction: BillingTransaction) -> None:
+        self._transactions[str(transaction.id.value)] = transaction
+
+    async def get_by_id(self, transaction_id: TransactionId) -> BillingTransaction | None:
+        return self._transactions.get(str(transaction_id.value))
+
+    async def list_by_user_id(self, user_id: UserId) -> list[BillingTransaction]:
+        transactions = [transaction for transaction in self._transactions.values() if transaction.user_id == user_id]
+        return sorted(transactions, key=lambda transaction: transaction.created_at, reverse=True)
 
 
 class InMemoryMediaAssetRepository:
