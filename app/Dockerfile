@@ -5,7 +5,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-RUN pip install --no-cache-dir sqlalchemy asyncpg aiosqlite
+RUN pip install --no-cache-dir aio-pika sqlalchemy asyncpg aiosqlite fastapi uvicorn pydantic aiogram httpx passlib bcrypt
 
 COPY src /app/src
 

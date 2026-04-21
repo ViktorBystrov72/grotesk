@@ -438,6 +438,26 @@ docker compose down
 - `http://localhost/health`
 - `http://localhost:15672`
 
+## RabbitMQ flow
+
+По умолчанию API публикует processing-задачи в очередь RabbitMQ `ml_tasks`, 
+а воркеры читают эту очередь в режиме `one publisher -> many consumers`.
+
+Для запуска нескольких воркеров:
+
+```bash
+docker compose up --scale worker=2
+```
+
+После этого можно отправить несколько запросов подряд на:
+
+- `POST /predict/transcription`
+- `POST /predict/video-editing`
+
+Результат обработки сохраняется в БД через `processing_jobs` и `job_history_records`, 
+а в финальной записи истории фиксируется `worker_id` и mock prediction. 
+Это позволяет вручную проверить корректность обработки и распределение задач между несколькими воркерами.
+
 ## Проверка тестами
 
 Для локальной проверки ORM-сценариев:

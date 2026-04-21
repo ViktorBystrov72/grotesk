@@ -29,8 +29,17 @@ from grotesk.infrastructure.db.repositories.media import MediaAssetRepositoryImp
 from grotesk.infrastructure.db.repositories.processing import ProcessingJobRepositoryImpl
 from grotesk.infrastructure.db.repositories.user import UserRepositoryImpl
 from grotesk.infrastructure.db.uow import SQLAlchemyUnitOfWork
+from grotesk.infrastructure.messaging.config import MessagingConfig
+from grotesk.infrastructure.messaging.publisher import RabbitMQEventPublisher
 from grotesk.infrastructure.stubs import InMemoryEventPublisher
 from grotesk.main.application import Application
+
+
+def build_event_publisher():
+    messaging_config = MessagingConfig.from_env()
+    if messaging_config.backend == "rabbitmq":
+        return RabbitMQEventPublisher(messaging_config)
+    return InMemoryEventPublisher()
 
 
 def build_application(session: AsyncSession) -> Application:
@@ -42,7 +51,7 @@ def build_application(session: AsyncSession) -> Application:
     model_catalog_repository = ModelCatalogRepositoryImpl(session)
     processing_job_repository = ProcessingJobRepositoryImpl(session)
 
-    publisher = InMemoryEventPublisher()
+    publisher = build_event_publisher()
     uow = SQLAlchemyUnitOfWork(session)
 
     billing_service = BillingService(

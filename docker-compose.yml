@@ -6,7 +6,23 @@ services:
     env_file:
       - .env
     environment:
+      MESSAGING_BACKEND: rabbitmq
       PYTHONPATH: /workspace/src:/app/src
+    volumes:
+      - ./app/src:/app/src
+      - ./src:/workspace/src
+    depends_on:
+      - rabbitmq
+      - database
+
+  worker:
+    build: ./app
+    env_file:
+      - .env
+    environment:
+      MESSAGING_BACKEND: rabbitmq
+      PYTHONPATH: /workspace/src:/app/src
+    command: ["python", "/app/src/worker.py"]
     volumes:
       - ./app/src:/app/src
       - ./src:/workspace/src
