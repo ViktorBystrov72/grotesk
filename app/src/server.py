@@ -1,46 +1,40 @@
-import json
+import logging
 import os
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from contextlib import asynccontextmanager
+
+import uvicorn
+from fastapi import FastAPI
+
+from grotesk.infrastructure.db.config import DBConfig
+from grotesk.infrastructure.db.init_data import initialize_database
+from grotesk.infrastructure.db.session import build_engine, build_session_factory
+from grotesk.presentation.api.main import create_app
+
+logging.basicConfig(level=logging.INFO)
 
 
-class RequestHandler(BaseHTTPRequestHandler):
-    def _write_json(self, payload: dict[str, object], status_code: int = 200) -> None:
-        body = json.dumps(payload).encode("utf-8")
-        self.send_response(status_code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db_config = DBConfig.from_env()
+    engine = build_engine(db_config)
+    session_factory = build_session_factory(engine)
+    await initialize_database(engine, session_factory)
 
-    def do_GET(self) -> None:  # noqa: N802
-        if self.path == "/health":
-            self._write_json(
-                {
-                    "status": "ok",
-                    "service": os.getenv("APP_NAME", "grotesk-app"),
-                    "environment": os.getenv("APP_ENV", "development"),
-                },
-            )
-            return
+    app.state.session_factory = session_factory  # type: ignore
 
-        self._write_json(
-            {
-                "service": os.getenv("APP_NAME", "grotesk-app"),
-                "environment": os.getenv("APP_ENV", "development"),
-                "message": "Grotesk app is running behind web-proxy.",
-            },
-        )
+    yield
 
-    def log_message(self, format: str, *args: object) -> None:
-        return None
+    await engine.dispose()
 
 
 def main() -> None:
+    app = create_app(lifespan=lifespan)
+
     host = os.getenv("APP_HOST", "0.0.0.0")
     port = int(os.getenv("APP_PORT", "8000"))
-    server = ThreadingHTTPServer((host, port), RequestHandler)
-    print(f"Starting app on {host}:{port}")
-    server.serve_forever()
+
+    logging.info(f"Starting API on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":

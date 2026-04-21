@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 from grotesk.domain.processing.model import JobId, JobType, ProcessingStatus
 
@@ -14,4 +15,5 @@ class ProcessingJobDTO:
     job_id: JobId
     job_type: JobType
     status: ProcessingStatus
+    created_at: datetime | None
     history: list[JobHistoryItemDTO]

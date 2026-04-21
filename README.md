@@ -364,9 +364,9 @@ grotesk/
 7. Результат сохраняется как VideoEditResult.
 8. При успехе транзакция подтверждается и история обновляется.
 
-## Структура проекта
+### Структура проекта
 
-text
+```text
 grotesk/
 ├── .env
 ├── README.md
@@ -376,9 +376,15 @@ grotesk/
 │   ├── Dockerfile
 │   └── src/
 │       └── server.py
+├── database/
+│   └── data/
+├── rabbitmq/
+│   └── data/
 ├── web-proxy/
 │   ├── Dockerfile
 │   └── nginx.conf
+├── tests/
+│   └── test_db_scenarios.py
 └── src/
     └── grotesk/
         ├── application/
@@ -386,7 +392,17 @@ grotesk/
         ├── infrastructure/
         ├── main/
         └── presentation/
+```
 
+## Стек
+
+- Python 3.12+
+- SQLAlchemy 2.x
+- asyncpg
+- PostgreSQL
+- RabbitMQ
+- Docker Compose
+- Nginx
 
 ## Запуск проекта
 
@@ -397,11 +413,13 @@ docker compose build
 ```
 
 Запуск:
+
 ```bash
 docker compose up
 ```
 
 Запуск в фоне:
+
 ```bash
 docker compose up -d
 ```
@@ -412,10 +430,24 @@ docker compose up -d
 docker compose down
 ```
 
-## Проверка
+## Проверка после запуска
 
 После запуска должны быть доступны:
 
-- http://localhost/
-- http://localhost/health
-- http://localhost:15672
+- `http://localhost/`
+- `http://localhost/health`
+- `http://localhost:15672`
+
+## Проверка тестами
+
+Для локальной проверки ORM-сценариев:
+
+```bash
+source venv/bin/activate
+make test
+```
+
+Установить зависимости
+```bash
+pip install -e .
+```

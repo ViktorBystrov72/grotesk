@@ -6,12 +6,12 @@ from grotesk.domain.billing.service import BillingService
 from grotesk.domain.catalog.interfaces import ModelCatalogRepository
 from grotesk.domain.catalog.model import Capability, ModelId
 from grotesk.domain.common.primitives import Money
+from grotesk.domain.identity_access.model import UserId
 from grotesk.domain.media_ingestion.interfaces import MediaAssetRepository
 from grotesk.domain.media_ingestion.model import MediaAssetId, MediaType
 from grotesk.domain.processing.events import TranscriptionJobSubmitted, VideoEditingJobSubmitted
 from grotesk.domain.processing.interfaces import ProcessingJobRepository
 from grotesk.domain.processing.model import JobId, JobType, ProcessingJob
-from grotesk.domain.identity_access.model import UserId
 
 
 @dataclass(frozen=True)

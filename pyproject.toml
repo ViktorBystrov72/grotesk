@@ -1,8 +1,27 @@
 [project]
 name = "grotesk"
-version = "0.1.0"
+version = "0.4.0"
 description = "ML media service"
 requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy",
+    "asyncpg",
+    "aiosqlite",
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "aiogram",
+    "httpx",
+    "passlib",
+    "bcrypt",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -13,3 +32,18 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+]
