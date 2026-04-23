@@ -1,10 +1,10 @@
 import pytest
 
+from grotesk.presentation.api.routers import auth
+
 
 @pytest.mark.asyncio
 async def test_register_success(client):
-    from grotesk.presentation.api.routers import auth
-
     original_hash = auth.get_password_hash
     auth.get_password_hash = lambda p: "hashed_" + p
 
@@ -18,8 +18,6 @@ async def test_register_success(client):
 
 @pytest.mark.asyncio
 async def test_register_existing_user(client):
-    from grotesk.presentation.api.routers import auth
-
     original_hash = auth.get_password_hash
     auth.get_password_hash = lambda p: "hashed_" + p
 
@@ -39,8 +37,6 @@ async def test_register_validation_error(client):
 
 @pytest.mark.asyncio
 async def test_login_success(client):
-    from grotesk.presentation.api.routers import auth
-
     original_verify = auth.verify_password
     auth.verify_password = lambda p, h: True
 

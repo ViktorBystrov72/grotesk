@@ -56,6 +56,46 @@ class BillingService(DomainService):
         )
         self.record_event(CreditsReserved(user_id=user_id, job_id=job_id, amount=amount))
 
+    async def confirm_reservation(self, user_id: UserId, job_id: JobId) -> None:
+        account_balance = await self._account_balance_repository.get_by_user_id(user_id)
+        if account_balance is None:
+            raise ValueError("Account balance does not exist.")
+
+        confirmed_amount = account_balance.confirm_reservation(job_id)
+        if confirmed_amount is None:
+            return
+
+        await self._account_balance_repository.save(account_balance)
+        await self._billing_transaction_repository.add(
+            BillingTransaction(
+                id=TransactionId(uuid4()),
+                user_id=user_id,
+                amount=confirmed_amount,
+                transaction_type=TransactionType.CHARGE,
+                related_job_id=job_id,
+            ),
+        )
+
+    async def release_reservation(self, user_id: UserId, job_id: JobId) -> None:
+        account_balance = await self._account_balance_repository.get_by_user_id(user_id)
+        if account_balance is None:
+            raise ValueError("Account balance does not exist.")
+
+        released_amount = account_balance.release_reservation(job_id)
+        if released_amount is None:
+            return
+
+        await self._account_balance_repository.save(account_balance)
+        await self._billing_transaction_repository.add(
+            BillingTransaction(
+                id=TransactionId(uuid4()),
+                user_id=user_id,
+                amount=released_amount,
+                transaction_type=TransactionType.REFUND,
+                related_job_id=job_id,
+            ),
+        )
+
     async def top_up_balance(self, user_id: UserId, amount: Money) -> None:
         account_balance = await self._account_balance_repository.get_by_user_id(user_id)
         if account_balance is None:

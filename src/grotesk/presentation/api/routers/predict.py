@@ -12,7 +12,7 @@ from grotesk.domain.catalog.model import ModelId
 from grotesk.domain.common.primitives import Money
 from grotesk.domain.identity_access.model import UserId
 from grotesk.domain.media_ingestion.model import MediaAssetId
-from grotesk.domain.processing.model import JobId
+from grotesk.domain.processing.model import JobId, TimelineOperation
 from grotesk.main.application import Application
 from grotesk.presentation.api.dependencies import get_application
 from grotesk.presentation.api.schemas.predict import (
@@ -62,6 +62,16 @@ async def submit_video_editing(
         media_asset_id=MediaAssetId(request.media_asset_id),
         model_id=ModelId(request.model_id),
         estimated_cost=estimated_cost,
+        prompt_text=request.prompt_text,
+        operations=[
+            TimelineOperation(
+                start_second=operation.start_second,
+                end_second=operation.end_second,
+                prompt=operation.prompt,
+                reference_asset_id=MediaAssetId(operation.reference_asset_id) if operation.reference_asset_id else None,
+            )
+            for operation in request.operations
+        ],
     )
     try:
         await application.submit_video_edit_job(command)

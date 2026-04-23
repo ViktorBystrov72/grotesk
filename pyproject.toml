@@ -4,17 +4,28 @@ version = "0.5.0"
 description = "ML media service"
 requires-python = ">=3.12"
 dependencies = [
+    "accelerate",
     "aio-pika",
-    "sqlalchemy",
-    "asyncpg",
-    "aiosqlite",
-    "fastapi",
-    "uvicorn",
-    "pydantic",
     "aiogram",
+    "aiosqlite",
+    "asyncpg",
+    "bcrypt",
+    "diffusers @ git+https://github.com/huggingface/diffusers.git",
+    "fastapi",
+    "ffmpeg-python",
+    "greenlet",
     "httpx",
     "passlib",
-    "bcrypt",
+    "pydantic",
+    "safetensors",
+    "scikit-learn",
+    "sqlalchemy",
+    "speechbrain",
+    "sentencepiece",
+    "torch",
+    "torchaudio",
+    "transformers",
+    "uvicorn",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +48,12 @@ where = ["src"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+filterwarnings = [
+    "ignore:'crypt' is deprecated and slated for removal in Python 3\\.13:DeprecationWarning",
+    "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 120

@@ -207,6 +207,8 @@ class ProcessingJobModel(Base):
     job_type: Mapped[JobType] = mapped_column(sa.Enum(JobType, native_enum=False), nullable=False)
     estimated_cost_amount: Mapped[Decimal] = mapped_column(sa.Numeric(12, 2), nullable=False)
     estimated_cost_currency: Mapped[str] = mapped_column(sa.String(32), nullable=False, default="CREDIT")
+    prompt_text: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    operations_payload: Mapped[list[dict[str, object]] | None] = mapped_column(sa.JSON, nullable=True)
     status: Mapped[ProcessingStatus] = mapped_column(
         sa.Enum(ProcessingStatus, native_enum=False),
         nullable=False,

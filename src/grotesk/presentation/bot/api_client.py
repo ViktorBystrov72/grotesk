@@ -51,12 +51,24 @@ class APIClient:
             response.raise_for_status()
             return response.json()["job_id"]
 
-    async def submit_video_editing(self, user_id: str, media_asset_id: str, model_id: str, prompt_text: str) -> str:
+    async def submit_video_editing(
+        self,
+        user_id: str,
+        media_asset_id: str,
+        model_id: str,
+        prompt_text: str,
+        operations: list[dict[str, Any]] | None = None,
+    ) -> str:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{self.base_url}/predict/video-editing",
                 params={"user_id": user_id},
-                json={"media_asset_id": media_asset_id, "model_id": model_id, "prompt_text": prompt_text},
+                json={
+                    "media_asset_id": media_asset_id,
+                    "model_id": model_id,
+                    "prompt_text": prompt_text,
+                    "operations": operations or [],
+                },
             )
             response.raise_for_status()
             return response.json()["job_id"]

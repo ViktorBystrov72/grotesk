@@ -11,7 +11,7 @@ from grotesk.domain.media_ingestion.interfaces import MediaAssetRepository
 from grotesk.domain.media_ingestion.model import MediaAssetId, MediaType
 from grotesk.domain.processing.events import TranscriptionJobSubmitted, VideoEditingJobSubmitted
 from grotesk.domain.processing.interfaces import ProcessingJobRepository
-from grotesk.domain.processing.model import JobId, JobType, ProcessingJob
+from grotesk.domain.processing.model import JobId, JobType, ProcessingJob, TimelineOperation
 
 
 @dataclass(frozen=True)
@@ -75,6 +75,8 @@ class SubmitVideoEditingJob(Command[JobId]):
     media_asset_id: MediaAssetId
     model_id: ModelId
     estimated_cost: Money
+    prompt_text: str
+    operations: list[TimelineOperation]
 
 
 class SubmitVideoEditingJobHandler(CommandHandler[SubmitVideoEditingJob, JobId]):
@@ -110,6 +112,8 @@ class SubmitVideoEditingJobHandler(CommandHandler[SubmitVideoEditingJob, JobId])
             model_id=command.model_id,
             job_type=JobType.VIDEO_EDITING,
             estimated_cost=command.estimated_cost,
+            prompt_text=command.prompt_text,
+            operations=list(command.operations),
         )
         job.queue()
 

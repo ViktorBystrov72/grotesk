@@ -66,6 +66,25 @@ class AccountBalance(Entity):
         self.available = Money(self.available.amount - reservation.amount.amount, self.available.currency)
         self.reservations.append(reservation)
 
+    def confirm_reservation(self, job_id: JobId) -> Money | None:
+        for reservation in self.reservations:
+            if reservation.job_id == job_id:
+                if reservation.is_confirmed:
+                    return None
+                reservation.confirm()
+                return reservation.amount
+        return None
+
+    def release_reservation(self, job_id: JobId) -> Money | None:
+        for index, reservation in enumerate(self.reservations):
+            if reservation.job_id == job_id:
+                if reservation.is_confirmed:
+                    return None
+                self.available = Money(self.available.amount + reservation.amount.amount, self.available.currency)
+                self.reservations.pop(index)
+                return reservation.amount
+        return None
+
     def top_up(self, amount: Money) -> None:
         self.available = Money(self.available.amount + amount.amount, self.available.currency)
 

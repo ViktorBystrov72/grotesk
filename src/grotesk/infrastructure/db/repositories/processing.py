@@ -10,6 +10,18 @@ from grotesk.infrastructure.db.repositories.base import SQLAlchemyRepository
 
 
 class ProcessingJobRepositoryImpl(SQLAlchemyRepository, ProcessingJobRepository):
+    @staticmethod
+    def _serialize_operations(job: ProcessingJob) -> list[dict[str, object]]:
+        return [
+            {
+                "start_second": operation.start_second,
+                "end_second": operation.end_second,
+                "prompt": operation.prompt,
+                "reference_asset_id": str(operation.reference_asset_id.value) if operation.reference_asset_id else None,
+            }
+            for operation in job.operations
+        ]
+
     async def add(self, job: ProcessingJob) -> None:
         model = ProcessingJobModel(
             id=job.id.value,
@@ -19,6 +31,8 @@ class ProcessingJobRepositoryImpl(SQLAlchemyRepository, ProcessingJobRepository)
             job_type=job.job_type,
             estimated_cost_amount=job.estimated_cost.amount,
             estimated_cost_currency=job.estimated_cost.currency,
+            prompt_text=job.prompt_text,
+            operations_payload=self._serialize_operations(job),
             status=job.status,
             result_type=job.result_ref.result_type if job.result_ref else None,
             result_id=job.result_ref.result_id.value if job.result_ref else None,
@@ -70,6 +84,8 @@ class ProcessingJobRepositoryImpl(SQLAlchemyRepository, ProcessingJobRepository)
         model.job_type = job.job_type
         model.estimated_cost_amount = job.estimated_cost.amount
         model.estimated_cost_currency = job.estimated_cost.currency
+        model.prompt_text = job.prompt_text
+        model.operations_payload = self._serialize_operations(job)
         model.status = job.status
         model.result_type = job.result_ref.result_type if job.result_ref else None
         model.result_id = job.result_ref.result_id.value if job.result_ref else None
