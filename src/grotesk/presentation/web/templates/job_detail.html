@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Задача {{ job.job_id.value }}{% endblock %}
+{% block content %}
+{% set last_h = job.history|last if job.history else none %}
+<div class="card">
+    <h1>Задача {{ job.job_id.value }}</h1>
+    <p><strong>Тип:</strong> {{ job.job_type.value }}</p>
+    <div class="status-line">
+        <strong>Текущий статус (как в API):</strong>
+        <span class="status-pill status-pill--{{ job.status.value }}">{{ job.status.value }}</span>
+        <details class="status-help-details" id="status-definitions">
+            <summary class="status-help-ico" aria-label="Справка: что значит каждый статус" title="Справка по статусам">?</summary>
+            <div class="status-help-body" role="tooltip">
+                <p class="status-help-title">Статусы</p>
+                <ul class="status-help-list">
+                    <li><code>pending</code> — задача принята API, согласована с биллингом (бронь кредитов).</li>
+                    <li><code>queued</code> — сообщение в очереди; воркер ещё не начал — ждите <code>running</code>.</li>
+                    <li><code>running</code> — воркер выполняет модель. Длительность зависит от файла и нагрузки (часто минуты).</li>
+                    <li><code>completed</code> — успех; артефакт/JSON, бронь списана по правилам.</li>
+                    <li><code>failed</code> — сбой воркера/пайплайна; бронь снимается, начисления за успех нет.</li>
+                </ul>
+            </div>
+        </details>
+    </div>
+    <script>
+    (function () {
+        var d = document.getElementById("status-definitions");
+        if (!d) return;
+        var t = null;
+        d.addEventListener("mouseenter", function () { clearTimeout(t); d.open = true; });
+        d.addEventListener("mouseleave", function () {
+            t = setTimeout(function () { d.open = false; }, 280);
+        });
+    })();
+    </script>
+    {% if job.status.value == 'failed' %}
+    {% if last_h %}
+    <div class="job-failed-error-box">
+        <div class="job-failed-error-box__label">Сообщение воркера</div>
+        <pre class="job-failed-error-text">{{ last_h.message }}</pre>
+    </div>
+    {% endif %}
+    {% endif %}
+    <p><strong>Создана:</strong> {{ job.created_at.isoformat() if job.created_at else '' }}</p>
+    {% if job.prompt_text %}
+        <p><strong>Prompt:</strong> {{ job.prompt_text }}</p>
+    {% endif %}
+    {% if auto_refresh %}
+    <p class="auto-refresh-hint">Страница <strong>автоматически обновляется каждые 15 сек.</strong>, пока задача не в статусе «готово» или «ошибка».</p>
+    <script>window.setTimeout(function () { location.reload(); }, 15000);</script>
+    {% endif %}
+    {% if artifact_url %}
+        <p><a href="{{ artifact_url }}">Скачать артефакт результата</a></p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Ход выполнения</h2>
+    <ol class="status-stepper" aria-label="Этапы задачи">
+        {% for step in status_stages %}
+        <li class="status-step status-step--{{ step.state }}">
+            <div class="status-step__inner">
+                <span class="status-step__icon" {% if step.state == 'active' %}aria-label="Выполняется"{% else %}aria-hidden="true"{% endif %}>
+                    {% if step.state == 'done' %}
+                        ✓
+                    {% elif step.state == 'active' %}
+                        <span class="status-step__spinner" title="В процессе"></span>
+                    {% elif step.state == 'error' %}
+                        ✕
+                    {% else %}
+                        ○
+                    {% endif %}
+                </span>
+                <div class="status-step__text">
+                    <div class="status-step__title">{{ step.title }} <span class="status-code">({{ step.code }})</span></div>
+                    <p class="status-step__desc">{{ step.description }}</p>
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ol>
+</div>
+
+{% if result %}
+<div class="card">
+    <h2>Результат</h2>
+    <pre>{{ result | tojson(indent=2) }}</pre>
+</div>
+{% endif %}
+{% endblock %}

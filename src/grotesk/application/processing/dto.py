@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from uuid import UUID
 
 from grotesk.domain.processing.model import JobId, JobType, ProcessingStatus
 
@@ -16,4 +17,16 @@ class ProcessingJobDTO:
     job_type: JobType
     status: ProcessingStatus
     created_at: datetime | None
+    history: list[JobHistoryItemDTO]
+
+
+@dataclass(frozen=True)
+class ProcessingJobDetailDTO:
+    job_id: JobId
+    job_type: JobType
+    status: ProcessingStatus
+    created_at: datetime | None
+    prompt_text: str | None
+    result_type: str | None
+    result_id: UUID | None
     history: list[JobHistoryItemDTO]

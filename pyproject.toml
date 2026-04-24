@@ -1,6 +1,6 @@
 [project]
 name = "grotesk"
-version = "0.5.0"
+version = "0.6.0"
 description = "ML media service"
 requires-python = ">=3.12"
 dependencies = [
@@ -15,8 +15,10 @@ dependencies = [
     "ffmpeg-python",
     "greenlet",
     "httpx",
-    "passlib",
+    "itsdangerous",
+    "jinja2",
     "pydantic",
+    "python-multipart",
     "safetensors",
     "scikit-learn",
     "sqlalchemy",
@@ -24,6 +26,7 @@ dependencies = [
     "sentencepiece",
     "torch",
     "torchaudio",
+    "opencv-python-headless",
     "transformers",
     "uvicorn",
 ]

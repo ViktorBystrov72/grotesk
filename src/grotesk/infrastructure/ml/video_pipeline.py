@@ -5,9 +5,11 @@ import tempfile
 from pathlib import Path
 from typing import Any, Iterable
 
+import cv2
 import torch
 from diffusers import AutoencoderKLWan, LucyEditPipeline
-from diffusers.utils import export_to_video, load_video
+from diffusers.utils import export_to_video
+from PIL import Image
 
 from grotesk.domain.processing.model import TimelineOperation
 from grotesk.infrastructure.ml.config import MLConfig
@@ -105,17 +107,34 @@ class HuggingFaceVideoPipeline:
             return f"{prompt_text.strip()}. {operation_prompt.strip()}".strip()
         return operation_prompt.strip()
 
+    def _load_video_pil_frames(self, input_segment_path: Path, num_frames: int) -> list[Image.Image]:
+        cap = cv2.VideoCapture(str(input_segment_path))
+        if not cap.isOpened():
+            msg = f"Failed to open video: {input_segment_path}"
+            raise RuntimeError(msg)
+        frames: list[Image.Image] = []
+        try:
+            while len(frames) < num_frames:
+                ok, bgr = cap.read()
+                if not ok or bgr is None:
+                    break
+                rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+                frames.append(Image.fromarray(rgb))
+        finally:
+            cap.release()
+        if not frames:
+            msg = f"No frames read from: {input_segment_path}"
+            raise RuntimeError(msg)
+        target_size = (self._config.video_width, self._config.video_height)
+        return [frame.resize(target_size) for frame in frames[:num_frames]]
+
     def _run_model(self, input_segment_path: Path, output_segment_path: Path, model_id: str, prompt: str) -> None:
         pipeline = self._get_pipeline(model_id)
         target_fps = self._config.video_fps
         segment_duration = max(self._probe_duration(input_segment_path), 1.0 / target_fps)
         num_frames = max(1, min(self._config.video_max_frames, math.ceil(segment_duration * target_fps)))
 
-        def convert_video(video_frames: list[Any]) -> list[Any]:
-            limited_frames = video_frames[:num_frames]
-            return [frame.resize((self._config.video_width, self._config.video_height)) for frame in limited_frames]
-
-        loaded_video = load_video(str(input_segment_path), convert_method=convert_video)
+        loaded_video = self._load_video_pil_frames(input_segment_path, num_frames)
         output = pipeline(
             prompt=prompt,
             video=loaded_video,

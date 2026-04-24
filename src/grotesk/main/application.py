@@ -9,6 +9,7 @@ from grotesk.application.billing.queries import (
     GetUserBalanceHandler,
     GetUserTransactionHistoryHandler,
 )
+from grotesk.application.catalog.queries import GetAvailableModelsHandler
 from grotesk.application.identity_access.commands import RegisterUserHandler
 from grotesk.application.identity_access.queries import GetUserByEmailHandler, GetUserByIdHandler
 from grotesk.application.media_ingestion.commands import UploadMediaAssetHandler
@@ -16,7 +17,7 @@ from grotesk.application.processing.commands import (
     SubmitTranscriptionJobHandler,
     SubmitVideoEditingJobHandler,
 )
-from grotesk.application.processing.queries import GetUserJobHistoryHandler
+from grotesk.application.processing.queries import GetUserJobDetailsHandler, GetUserJobHistoryHandler
 
 
 @dataclass(frozen=True)
@@ -29,10 +30,14 @@ class Application:
     # Media Ingestion
     upload_media: UploadMediaAssetHandler
 
+    # Catalog
+    get_available_models: GetAvailableModelsHandler
+
     # Processing
     submit_transcription_job: SubmitTranscriptionJobHandler
     submit_video_edit_job: SubmitVideoEditingJobHandler
     get_user_job_history: GetUserJobHistoryHandler
+    get_user_job_detail: GetUserJobDetailsHandler
 
     # Billing
     approve_top_up: ApproveTopUpHandler

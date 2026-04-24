@@ -1,12 +1,16 @@
 services:
   app:
-    build: ./app
+    build:
+      context: .
+      dockerfile: app/Dockerfile
     env_file:
       - .env
     environment:
       MESSAGING_BACKEND: rabbitmq
       MEDIA_STORAGE_ROOT: /media
       PYTHONPATH: /workspace/src:/app/src
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-grotesk}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-grotesk}
     volumes:
       - ./app/src:/app/src
       - ./src:/workspace/src
@@ -27,19 +31,16 @@ services:
       MEDIA_STORAGE_ROOT: /media
       RESULT_ARTIFACT_ROOT: /media/results
       PYTHONPATH: /workspace/src:/app/src
+      # python-slim image has no CUDA; keep CPU (overrides .env HF_DEVICE for this service).
+      HF_DEVICE: cpu
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-grotesk}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-grotesk}
     command: ["python", "/app/src/worker.py"]
     volumes:
       - ./app/src:/app/src
       - ./src:/workspace/src
       - media_data:/media
       - hf_cache:/models/hf
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     depends_on:
       - rabbitmq
       - database
@@ -59,8 +60,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-grotesk}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-grotesk}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
 

@@ -32,7 +32,7 @@ class MLConfig:
             audio_model_id=os.getenv("HF_AUDIO_MODEL_ID", DEFAULT_AUDIO_MODEL_ID),
             speaker_model_id=os.getenv("HF_SPEAKER_MODEL_ID", DEFAULT_SPEAKER_MODEL_ID),
             video_model_id=os.getenv("HF_VIDEO_MODEL_ID", DEFAULT_VIDEO_MODEL_ID),
-            device=os.getenv("HF_DEVICE", "cuda"),
+            device=os.getenv("HF_DEVICE", "cpu"),
             video_width=int(os.getenv("HF_VIDEO_WIDTH", "832")),
             video_height=int(os.getenv("HF_VIDEO_HEIGHT", "480")),
             video_fps=int(os.getenv("HF_VIDEO_FPS", "24")),

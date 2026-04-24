@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Grotesk - ML сервис{% endblock %}
+{% block content %}
+<div class="card">
+    <h1>ML-кабинет сервиса Grotesk</h1>
+    <p>Сервис умеет обрабатывать аудио и видео через backend API, очередь задач и ML-воркеры.</p>
+    <ul>
+        <li>транскрибация аудио и разбиение по спикерам;</li>
+        <li>video-editing по prompt и таймкодам;</li>
+        <li>контроль баланса и истории операций;</li>
+        <li>просмотр результата обработки из личного кабинета.</li>
+    </ul>
+    {% if current_user %}
+        <p><a href="/cabinet">Перейти в личный кабинет</a></p>
+    {% else %}
+        <p><a href="/register">Создать аккаунт</a> или <a href="/login">войти</a>.</p>
+    {% endif %}
+</div>
+{% endblock %}

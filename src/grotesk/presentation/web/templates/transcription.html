@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Транскрибация{% endblock %}
+{% block content %}
+<div class="card">
+    <h1>Транскрибация аудио</h1>
+    <form action="/cabinet/transcription" method="post" enctype="multipart/form-data">
+        <select name="model_id" required>
+            <option value="">Выберите модель</option>
+            {% for model in models %}
+                <option value="{{ model.model_id.value }}">{{ model.name }}</option>
+            {% endfor %}
+        </select>
+        <input type="file" name="file" accept="audio/*" required>
+        <button class="primary" type="submit">Запустить</button>
+    </form>
+</div>
+{% endblock %}

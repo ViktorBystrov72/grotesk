@@ -9,6 +9,7 @@ from grotesk.application.billing.queries import (
     GetUserBalanceHandler,
     GetUserTransactionHistoryHandler,
 )
+from grotesk.application.catalog.queries import GetAvailableModelsHandler
 from grotesk.application.identity_access.commands import RegisterUserHandler
 from grotesk.application.identity_access.queries import GetUserByEmailHandler, GetUserByIdHandler
 from grotesk.application.media_ingestion.commands import UploadMediaAssetHandler
@@ -16,7 +17,7 @@ from grotesk.application.processing.commands import (
     SubmitTranscriptionJobHandler,
     SubmitVideoEditingJobHandler,
 )
-from grotesk.application.processing.queries import GetUserJobHistoryHandler
+from grotesk.application.processing.queries import GetUserJobDetailsHandler, GetUserJobHistoryHandler
 from grotesk.domain.billing.service import BillingService
 from grotesk.domain.media_ingestion.service import MediaIngestionService
 from grotesk.infrastructure.db.repositories.billing import (
@@ -66,6 +67,7 @@ def build_application(session: AsyncSession) -> Application:
         get_user_by_id=GetUserByIdHandler(user_repository),
         get_user_by_email=GetUserByEmailHandler(user_repository),
         upload_media=UploadMediaAssetHandler(media_ingestion_service, publisher, uow),
+        get_available_models=GetAvailableModelsHandler(model_catalog_repository),
         submit_transcription_job=SubmitTranscriptionJobHandler(
             processing_job_repository,
             media_asset_repository,
@@ -88,4 +90,5 @@ def build_application(session: AsyncSession) -> Application:
         get_user_transaction_history=GetUserTransactionHistoryHandler(billing_transaction_repository),
         get_user_balance=GetUserBalanceHandler(account_balance_repository),
         get_user_job_history=GetUserJobHistoryHandler(processing_job_repository),
+        get_user_job_detail=GetUserJobDetailsHandler(processing_job_repository),
     )

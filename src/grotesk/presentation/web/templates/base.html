@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Grotesk{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+</head>
+<body>
+<nav class="nav">
+    <div class="container">
+        <div class="nav-links">
+            <a href="/">Grotesk</a>
+            {% if current_user %}
+                <a href="/cabinet">Кабинет</a>
+                <a href="/cabinet/balance">Баланс</a>
+                <a href="/cabinet/transcription">Транскрибация</a>
+                <a href="/cabinet/video-editing">Video editing</a>
+                <a href="/cabinet/history">История</a>
+            {% endif %}
+        </div>
+        <div class="nav-links">
+            {% if current_user %}
+                <span>{{ current_user.email }}</span>
+                <form action="/logout" method="post">
+                    <button type="submit">Выйти</button>
+                </form>
+            {% else %}
+                <a href="/login">Вход</a>
+                <a href="/register">Регистрация</a>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<main class="container">
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+    {% if success %}
+        <div class="success">{{ success }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+</main>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from urllib.parse import quote
 
 
 @dataclass(frozen=True)
@@ -12,15 +13,23 @@ class MessagingConfig:
     worker_id: str
     processing_delay_seconds: float
 
+    @staticmethod
+    def _amqp_url_from_rabbit_env() -> str:
+        user = os.environ.get("RABBITMQ_DEFAULT_USER", "guest")
+        if "RABBITMQ_DEFAULT_PASS" in os.environ:
+            password = os.environ["RABBITMQ_DEFAULT_PASS"]  # may be "" for no password
+        else:
+            password = "guest"
+        host = os.environ.get("RABBITMQ_HOST", "localhost")
+        port = int(os.environ.get("RABBITMQ_PORT", "5672"))
+        u = quote(user, safe="")
+        p = quote(password, safe="")
+        return f"amqp://{u}:{p}@{host}:{port}/"
+
     @classmethod
     def from_env(cls) -> "MessagingConfig":
         backend = os.getenv("MESSAGING_BACKEND", "inmemory")
-        host = os.getenv("RABBITMQ_HOST", "rabbitmq")
-        port = int(os.getenv("RABBITMQ_PORT", "5672"))
-        user = os.getenv("RABBITMQ_DEFAULT_USER", "guest")
-        password = os.getenv("RABBITMQ_DEFAULT_PASS", "guest")
-        amqp_url = os.getenv("RABBITMQ_URL", f"amqp://{user}:{password}@{host}:{port}/")
-
+        amqp_url = cls._amqp_url_from_rabbit_env()
         return cls(
             backend=backend,
             amqp_url=amqp_url,
