@@ -9,6 +9,12 @@ async def test_get_balance_success(client):
 
 
 @pytest.mark.asyncio
+async def test_get_balance_without_user_context_returns_unauthorized(client):
+    response = await client.get("/balance")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_get_balance_not_found(client):
     response = await client.get("/balance", params={"user_id": "00000000-0000-0000-0000-000000000404"})
     assert response.status_code == 404
@@ -31,6 +37,12 @@ async def test_top_up_success(client):
     assert response.status_code == 200
     assert response.json()["status"] == "success"
     assert "request_id" in response.json()
+
+
+@pytest.mark.asyncio
+async def test_top_up_without_user_context_returns_unauthorized(client):
+    response = await client.post("/balance/top-up", json={"amount": 50.0})
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio

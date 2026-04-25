@@ -447,6 +447,10 @@ docker compose down
 ```bash
 docker compose build app --no-cache
 docker compose up -d app web-proxy
+или
+docker compose up -d --build app web-proxy
+или 
+docker compose restart app
 ```
 
 Пересборка все компонентов:
@@ -496,8 +500,6 @@ docker compose up --scale worker=2
 
 
 ## Проверка тестами
-
-Для локальной проверки ORM-сценариев:
 
 ```bash
 source venv/bin/activate

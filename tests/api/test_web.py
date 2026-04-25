@@ -1,10 +1,17 @@
 import io
+from datetime import UTC, datetime
+from uuid import UUID
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 
+from grotesk.application.processing.dto import JobHistoryItemDTO, ProcessingJobDTO
+from grotesk.domain.processing.model import JobId, JobType, ProcessingStatus
+from grotesk.presentation.api.dependencies import get_application
+from grotesk.presentation.api.main import create_app
 from grotesk.presentation.api.routers import auth
 from grotesk.presentation.web import routes
-from tests.api.conftest import TEST_ACTIVE_JOB_ID
+from tests.api.conftest import TEST_ACTIVE_JOB_ID, MockApplication
 
 
 async def login(client) -> None:
@@ -18,6 +25,35 @@ async def login(client) -> None:
     finally:
         auth.verify_password = original_verify
     assert response.status_code == 200
+
+
+class ManyJobsApplication(MockApplication):
+    async def __call__(self, command_or_query):
+        if type(command_or_query).__name__ == "GetUserJobHistory":
+            return [
+                ProcessingJobDTO(
+                    job_id=JobId(UUID(f"00000000-0000-0000-0000-{index + 1:012d}")),
+                    job_type=JobType.TRANSCRIPTION,
+                    status=ProcessingStatus.COMPLETED,
+                    created_at=datetime.now(UTC),
+                    source_filename=f"job-file-{index}.wav",
+                    model_name="openai/whisper-large-v3-turbo",
+                    history=[JobHistoryItemDTO(status=ProcessingStatus.COMPLETED, message="done")],
+                )
+                for index in range(12)
+            ]
+        return await super().__call__(command_or_query)
+
+
+def build_many_jobs_client() -> AsyncClient:
+    app = create_app()
+    application = ManyJobsApplication()
+
+    async def override_get_application():
+        return application
+
+    app.dependency_overrides[get_application] = override_get_application  # type: ignore
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
 @pytest.mark.asyncio
@@ -51,6 +87,55 @@ async def test_cabinet_page_renders_for_logged_user(client) -> None:
     assert "openai/whisper-large-v3-turbo".encode() in response.content
     assert "Готово".encode() in response.content
     assert b"status-pill--completed" in response.content
+
+
+@pytest.mark.asyncio
+async def test_cabinet_page_defaults_to_ten_recent_jobs() -> None:
+    async with build_many_jobs_client() as client:
+        await login(client)
+        response = await client.get("/cabinet")
+
+    assert response.status_code == 200
+    assert "Показано 10 из 12 задач.".encode() in response.content
+    assert b'<option value="10" selected' in response.content
+    assert "1 / 2".encode() in response.content
+    assert b'aria-disabled="true"' in response.content
+    assert b"/cabinet?job_limit=10&job_page=2" in response.content
+    assert "job-file-0.wav".encode() in response.content
+    assert "job-file-9.wav".encode() in response.content
+    assert "job-file-10.wav".encode() not in response.content
+    assert "job-file-11.wav".encode() not in response.content
+
+
+@pytest.mark.asyncio
+async def test_cabinet_page_applies_selected_job_limit() -> None:
+    async with build_many_jobs_client() as client:
+        await login(client)
+        response = await client.get("/cabinet?job_limit=5")
+
+    assert response.status_code == 200
+    assert "Показано 5 из 12 задач.".encode() in response.content
+    assert b'<option value="5" selected' in response.content
+    assert "job-file-0.wav".encode() in response.content
+    assert "job-file-4.wav".encode() in response.content
+    assert "job-file-5.wav".encode() not in response.content
+
+
+@pytest.mark.asyncio
+async def test_cabinet_page_applies_selected_job_page() -> None:
+    async with build_many_jobs_client() as client:
+        await login(client)
+        response = await client.get("/cabinet?job_limit=5&job_page=2")
+
+    assert response.status_code == 200
+    assert "Показано 5 из 12 задач.".encode() in response.content
+    assert "2 / 3".encode() in response.content
+    assert b"/cabinet?job_limit=5&job_page=1" in response.content
+    assert b"/cabinet?job_limit=5&job_page=3" in response.content
+    assert "job-file-4.wav".encode() not in response.content
+    assert "job-file-5.wav".encode() in response.content
+    assert "job-file-9.wav".encode() in response.content
+    assert "job-file-10.wav".encode() not in response.content
 
 
 @pytest.mark.asyncio
@@ -116,15 +201,18 @@ async def test_balance_page_renders_russian_transaction_types(client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_job_detail_page_shows_filename_and_time(client) -> None:
+async def test_job_detail_page_shows_filename_duration_and_time(client, monkeypatch) -> None:
     await login(client)
+    monkeypatch.setattr(routes, "probe_media_duration_seconds", lambda _storage_key: 125.0)
 
     response = await client.get("/cabinet/jobs/00000000-0000-0000-0000-000000000222")
 
     assert response.status_code == 200
     assert "Файл:".encode() in response.content
-    assert "Время:".encode() in response.content
     assert "sample.wav".encode() in response.content
+    assert "Длительность:".encode() in response.content
+    assert "2 мин 5 сек".encode() in response.content
+    assert "Время:".encode() in response.content
     assert "Модель:".encode() in response.content
     assert "openai/whisper-large-v3-turbo".encode() in response.content
     assert "Готово".encode() in response.content

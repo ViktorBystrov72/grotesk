@@ -37,6 +37,7 @@ from grotesk.presentation.api.routers.auth import get_password_hash, verify_pass
 from grotesk.presentation.helpers import (
     build_book_transcript,
     load_json_artifact,
+    probe_media_duration_seconds,
     register_uploaded_media,
     resolve_result_artifact_path,
 )
@@ -51,6 +52,8 @@ ACTIVE_JOB_STATUSES = {
     ProcessingStatus.QUEUED,
     ProcessingStatus.RUNNING,
 }
+CABINET_JOB_LIMIT_OPTIONS = (5, 10, 20, 50, 100)
+DEFAULT_CABINET_JOB_LIMIT = 10
 
 
 def setup_web(app: FastAPI) -> None:
@@ -71,6 +74,41 @@ def template_context(request: Request, current_user: UserDTO | None, **kwargs: o
 
 def redirect(url: str) -> RedirectResponse:
     return RedirectResponse(url=url, status_code=303)
+
+
+def normalize_cabinet_job_limit(limit: int) -> int:
+    if limit in CABINET_JOB_LIMIT_OPTIONS:
+        return limit
+    return DEFAULT_CABINET_JOB_LIMIT
+
+
+def normalize_cabinet_job_page(page: int, total_jobs: int, job_limit: int) -> int:
+    total_pages = max(1, (total_jobs + job_limit - 1) // job_limit)
+    return min(max(page, 1), total_pages)
+
+
+def format_duration_seconds(duration_seconds: float | int | None) -> str:
+    if duration_seconds is None:
+        return "—"
+    total_seconds = max(0, round(float(duration_seconds)))
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours} ч {minutes} мин {seconds} сек"
+    if minutes:
+        return f"{minutes} мин {seconds} сек"
+    return f"{seconds} сек"
+
+
+def resolve_job_duration_label(source_storage_key: str | None, result: dict[str, object] | None) -> str:
+    source_duration = probe_media_duration_seconds(source_storage_key)
+    if source_duration is not None:
+        return format_duration_seconds(source_duration)
+
+    result_duration = result.get("duration_seconds") if result is not None else None
+    if isinstance(result_duration, int | float):
+        return format_duration_seconds(result_duration)
+    return "—"
 
 
 def filter_models_by_capability(models: list[ModelProfileDTO], capability: Capability) -> list[ModelProfileDTO]:
@@ -259,15 +297,36 @@ async def cabinet_page(
     request: Request,
     application: Annotated[Application, Depends(get_application)],
     current_user: Annotated[UserDTO | None, Depends(get_optional_current_user)],
+    job_limit: int = DEFAULT_CABINET_JOB_LIMIT,
+    job_page: int = 1,
 ):
     if current_user is None:
         return redirect("/login")
+    selected_job_limit = normalize_cabinet_job_limit(job_limit)
     balance = Decimal(await application.get_user_balance(GetUserBalance(user_id=current_user.user_id)))
     jobs = await application.get_user_job_history(GetUserJobHistory(user_id=current_user.user_id))
+    total_jobs = len(jobs)
+    selected_job_page = normalize_cabinet_job_page(job_page, total_jobs, selected_job_limit)
+    total_job_pages = max(1, (total_jobs + selected_job_limit - 1) // selected_job_limit)
+    job_offset = (selected_job_page - 1) * selected_job_limit
     return templates.TemplateResponse(
         request=request,
         name="cabinet.html",
-        context=template_context(request, current_user, balance=balance, jobs=jobs[:5]),
+        context=template_context(
+            request,
+            current_user,
+            balance=balance,
+            jobs=jobs[job_offset : job_offset + selected_job_limit],
+            job_limit_options=CABINET_JOB_LIMIT_OPTIONS,
+            selected_job_limit=selected_job_limit,
+            selected_job_page=selected_job_page,
+            total_job_pages=total_job_pages,
+            previous_job_page=selected_job_page - 1,
+            next_job_page=selected_job_page + 1,
+            has_previous_job_page=selected_job_page > 1,
+            has_next_job_page=selected_job_page < total_job_pages,
+            total_jobs=total_jobs,
+        ),
     )
 
 
@@ -515,6 +574,7 @@ async def job_detail_page(
     result = load_json_artifact(artifact_path)
     status_stages = build_status_pipeline(job.status, job.history)
     auto_refresh = job.status in ACTIVE_JOB_STATUSES
+    duration_label = resolve_job_duration_label(job.source_storage_key, result)
     return templates.TemplateResponse(
         request=request,
         name="job_detail.html",
@@ -523,6 +583,7 @@ async def job_detail_page(
             current_user,
             job=job,
             result=result,
+            duration_label=duration_label,
             book_transcript=build_book_transcript(result),
             operation_rows=build_operation_rows(job.operations),
             artifact_url=f"/jobs/{job.job_id.value}/artifact" if artifact_path is not None else None,

@@ -5,6 +5,14 @@ import pytest
 from grotesk.presentation.api.routers import auth
 
 
+@pytest.mark.asyncio
+async def test_healthcheck_success(client) -> None:
+    response = await client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 async def login(client) -> None:
     original_verify = auth.verify_password
     auth.verify_password = lambda p, h: True
@@ -57,3 +65,20 @@ async def test_job_detail_success(client) -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_job_detail_requires_login(client) -> None:
+    response = await client.get("/jobs/00000000-0000-0000-0000-000000000222")
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_cancel_job_success(client) -> None:
+    await login(client)
+
+    response = await client.post("/jobs/00000000-0000-0000-0000-000000000223/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "canceled"}
