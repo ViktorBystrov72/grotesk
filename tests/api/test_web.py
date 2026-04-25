@@ -208,6 +208,9 @@ async def test_job_detail_page_shows_filename_duration_and_time(client, monkeypa
     response = await client.get("/cabinet/jobs/00000000-0000-0000-0000-000000000222")
 
     assert response.status_code == 200
+    assert "Исходное аудио".encode() in response.content
+    assert b"/cabinet/jobs/00000000-0000-0000-0000-000000000222/source-audio" in response.content
+    assert b"<audio " in response.content
     assert "Файл:".encode() in response.content
     assert "sample.wav".encode() in response.content
     assert "Длительность:".encode() in response.content
@@ -218,6 +221,28 @@ async def test_job_detail_page_shows_filename_duration_and_time(client, monkeypa
     assert "Готово".encode() in response.content
     assert "Принято".encode() in response.content
     assert "Отменена".encode() in response.content
+
+
+@pytest.mark.asyncio
+async def test_job_source_audio_requires_login(client) -> None:
+    response = await client.get(
+        "/cabinet/jobs/00000000-0000-0000-0000-000000000222/source-audio",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login"
+
+
+@pytest.mark.asyncio
+async def test_job_source_audio_streams_file_for_logged_user(client) -> None:
+    await login(client)
+
+    response = await client.get("/cabinet/jobs/00000000-0000-0000-0000-000000000222/source-audio")
+
+    assert response.status_code == 200
+    assert response.headers.get("content-type", "").startswith("audio/")
+    assert response.content == b"fake-wav"
 
 
 @pytest.mark.asyncio

@@ -15,12 +15,26 @@ from grotesk.domain.identity_access.model import UserId, UserRole
 from grotesk.domain.processing.model import JobId, JobType, ProcessingStatus
 from grotesk.presentation.api.dependencies import get_application
 from grotesk.presentation.api.main import create_app
+from grotesk.presentation.helpers import get_media_storage_root
 
 TEST_USER_ID = UserId(UUID("00000000-0000-0000-0000-000000000111"))
 TEST_JOB_ID = JobId(UUID("00000000-0000-0000-0000-000000000222"))
 TEST_ACTIVE_JOB_ID = JobId(UUID("00000000-0000-0000-0000-000000000223"))
 TEST_MODEL_ID = ModelId(UUID("00000000-0000-0000-0000-000000000333"))
 TEST_PASSWORD_HASH = "test-password-hash"
+
+
+def ensure_test_job_source_media_file() -> str:
+    media_root = get_media_storage_root()
+    audio_dir = media_root / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    path = audio_dir / "test-job-source.wav"
+    if not path.exists():
+        path.write_bytes(b"fake-wav")
+    return str(path.resolve())
+
+
+TEST_JOB_SOURCE_MEDIA_PATH = ensure_test_job_source_media_file()
 
 
 class MockApplication:
@@ -145,6 +159,7 @@ class MockApplication:
                     prompt_text=None,
                     result_type=None,
                     result_id=None,
+                    source_storage_key=TEST_JOB_SOURCE_MEDIA_PATH,
                     history=[
                         JobHistoryItemDTO(
                             status=ProcessingStatus.QUEUED,
@@ -168,6 +183,7 @@ class MockApplication:
                 prompt_text=None,
                 result_type="transcription",
                 result_id=None,
+                source_storage_key=TEST_JOB_SOURCE_MEDIA_PATH,
                 history=[
                     JobHistoryItemDTO(
                         status=ProcessingStatus.QUEUED,

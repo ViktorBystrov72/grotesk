@@ -188,6 +188,15 @@
     </ol>
 </div>
 
+{% if source_audio_url %}
+<div class="card">
+    <h2>Исходное аудио</h2>
+    <audio class="job-source-audio" controls preload="metadata" src="{{ source_audio_url }}">
+        Ваш браузер не поддерживает встроенное воспроизведение аудио.
+    </audio>
+</div>
+{% endif %}
+
 {% if book_transcript %}
 <div class="card">
     <h2>Транскрипт</h2>
