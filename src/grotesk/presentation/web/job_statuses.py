@@ -2,6 +2,7 @@ from grotesk.domain.processing.model import ProcessingStatus
 
 # Порядок нормального прохождения задачи (без ветки failed)
 _MAIN_FLOW: tuple[str, ...] = ("pending", "queued", "running", "completed")
+_INTERRUPTED_FLOW: tuple[str, ...] = ("pending", "queued", "running")
 
 # Короткие заголовки и пояснения для UI (легенда + маршрут)
 _LABELS: dict[str, tuple[str, str]] = {
@@ -11,8 +12,7 @@ _LABELS: dict[str, tuple[str, str]] = {
     ),
     "queued": (
         "В очереди",
-        "Задача в очереди брокера сообщений. "
-        "Воркер заберёт её, когда освободится — обычно от секунд до пары минут.",
+        "Задача в очереди брокера сообщений. Воркер заберёт её, когда освободится — обычно от секунд до пары минут.",
     ),
     "running": (
         "Выполняется",
@@ -24,36 +24,49 @@ _LABELS: dict[str, tuple[str, str]] = {
     ),
     "failed": (
         "Ошибка",
-        "Пайплайн завершился с ошибкой. "
-        "Кредиты: не списываются с брони или возвращаются — см. биллинг и логи воркера.",
+        "Пайплайн завершился с ошибкой. Кредиты: не списываются с брони или возвращаются — см. биллинг и логи воркера.",
+    ),
+    "canceled": (
+        "Отменена",
+        "Задача отменена пользователем. "
+        "Если ML уже стартовал, воркер прерывает дочерний процесс и освобождает бронь кредитов.",
     ),
 }
 
 
-def build_status_pipeline(current: ProcessingStatus) -> list[dict[str, str]]:
+def _status_code(record: object) -> str:
+    status = getattr(record, "status", record)
+    return str(status.value if hasattr(status, "value") else status)
+
+
+def build_status_pipeline(
+    current: ProcessingStatus,
+    history: list[object] | None = None,
+) -> list[dict[str, str]]:
     """
-    Состояния этапов для «маршрута» на странице задачи: done | active | upcoming | error.
+    Состояния этапов для «маршрута» на странице задачи: done | active | upcoming | error | canceled.
     """
     s = current.value
-    if s == "failed":
+    history_codes = {_status_code(record) for record in (history or [])}
+    if s in {"failed", "canceled"}:
         steps: list[dict[str, str]] = []
-        for code in ("pending", "queued", "running"):
+        for code in _INTERRUPTED_FLOW:
             title, description = _LABELS[code]
             steps.append(
                 {
                     "code": code,
                     "title": title,
                     "description": description,
-                    "state": "done",
+                    "state": "done" if code in history_codes else "upcoming",
                 }
             )
-        title, description = _LABELS["failed"]
+        title, description = _LABELS[s]
         steps.append(
             {
-                "code": "failed",
+                "code": s,
                 "title": title,
                 "description": description,
-                "state": "error",
+                "state": "canceled" if s == "canceled" else "error",
             }
         )
         return steps
@@ -66,7 +79,9 @@ def build_status_pipeline(current: ProcessingStatus) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     for i, code in enumerate(_MAIN_FLOW):
         title, description = _LABELS[code]
-        if i < active_index:
+        if s == "completed":
+            st = "done"
+        elif i < active_index:
             st = "done"
         elif i == active_index:
             st = "active"

@@ -3,7 +3,12 @@
 {% block content %}
 <div class="card">
     <h1>Video editing</h1>
-    <p>Формат операций: одна строка = <code>start|end|prompt</code></p>
+    <div class="form-help">
+        <div class="form-help__title">Формат операций: <code>start|end|prompt</code></div>
+        <p class="form-help__text">Время можно писать как <code>75</code>, <code>01:15</code> или <code>00:01:15</code>.</p>
+        <p class="form-help__text"><strong>Общий prompt</strong> задаёт общий стиль и контекст для всех операций. <strong>Операции по времени</strong> задают точечные изменения на конкретных отрезках видео.</p>
+        <p class="form-help__text">Если нужен только точечный монтаж по таймкодам, общий prompt можно оставить пустым.</p>
+    </div>
     <form action="/cabinet/video-editing" method="post" enctype="multipart/form-data">
         <select name="model_id" required>
             <option value="">Выберите модель</option>
@@ -11,8 +16,8 @@
                 <option value="{{ model.model_id.value }}">{{ model.name }}</option>
             {% endfor %}
         </select>
-        <textarea name="prompt_text" rows="4" placeholder="Общий prompt" required>{{ prompt_text or '' }}</textarea>
-        <textarea name="operations_text" rows="6" placeholder="0|5|Сделать сцену темнее&#10;10|15|Изменить внешний вид персонажа">{{ operations_text or '' }}</textarea>
+        <textarea name="prompt_text" rows="4" placeholder="Общий prompt (необязательно)">{{ prompt_text or '' }}</textarea>
+        <textarea name="operations_text" rows="6" placeholder="00:00|00:05|Сделать сцену темнее&#10;01:10|01:25|Сделать надпись красной">{{ operations_text or '' }}</textarea>
         <input type="file" name="file" accept="video/*" required>
         <button class="primary" type="submit">Запустить</button>
     </form>

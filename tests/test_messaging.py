@@ -6,7 +6,8 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from grotesk.domain.billing.model import AccountBalance, CreditReservation, TransactionType
+from grotesk.application.processing.commands import CancelProcessingJob
+from grotesk.domain.billing.model import AccountBalance, BillingTransaction, CreditReservation, TransactionType
 from grotesk.domain.catalog.model import Capability, ModelId, ModelProfile, PricingRule
 from grotesk.domain.common.primitives import FileLocation, Money
 from grotesk.domain.identity_access.model import Credential, Email, PasswordHash, User, UserId, UserRole
@@ -17,6 +18,7 @@ from grotesk.infrastructure.messaging.messages import JobSubmittedMessage
 from grotesk.infrastructure.messaging.worker import ProcessingWorker
 from grotesk.infrastructure.ml.artifacts import ResultArtifactStore
 from grotesk.infrastructure.ml.types import JobExecutionResult
+from grotesk.main.bootstrap import build_application
 from tests.support import (
     DBContext,
     build_messaging_assertion_repositories,
@@ -49,6 +51,13 @@ class TranscriptionJobSetup:
     media_asset_id: MediaAssetId
     model_id: ModelId
     job_id: JobId
+
+
+@dataclass(frozen=True)
+class MessagingAssertionState:
+    job: ProcessingJob | None
+    balance: AccountBalance | None
+    transactions: list[BillingTransaction]
 
 
 async def seed_transcription_job(
@@ -118,6 +127,19 @@ async def seed_transcription_job(
     return setup
 
 
+async def load_messaging_assertion_state(
+    session_factory: async_sessionmaker[AsyncSession],
+    setup: TranscriptionJobSetup,
+) -> MessagingAssertionState:
+    async with session_factory() as session:
+        repositories = build_messaging_assertion_repositories(session)
+        return MessagingAssertionState(
+            job=await repositories.processing_repository.get_by_id(setup.job_id),
+            balance=await repositories.account_balance_repository.get_by_user_id(setup.user_id),
+            transactions=await repositories.billing_transaction_repository.list_by_user_id(setup.user_id),
+        )
+
+
 def build_worker(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -176,23 +198,19 @@ async def test_worker_processes_job_and_confirms_reservation(db_context: DBConte
 
     await worker.process_message(payload)
 
-    async with session_factory() as session:
-        repositories = build_messaging_assertion_repositories(session)
-        saved_job = await repositories.processing_repository.get_by_id(setup.job_id)
-        saved_balance = await repositories.account_balance_repository.get_by_user_id(setup.user_id)
-        transactions = await repositories.billing_transaction_repository.list_by_user_id(setup.user_id)
+    state = await load_messaging_assertion_state(session_factory, setup)
 
-        assert saved_job is not None
-        assert saved_job.status.value == "completed"
-        assert saved_job.result_ref is not None
-        assert "test-worker" in saved_job.history[-1].message
-        assert "transcription" in saved_job.history[-1].message
-        assert saved_balance is not None
-        assert saved_balance.available.amount == Decimal("90")
-        assert len(saved_balance.reservations) == 1
-        assert saved_balance.reservations[0].is_confirmed is True
-        assert any(transaction.transaction_type == TransactionType.CHARGE for transaction in transactions)
-        assert list((tmp_path / "results" / "transcription").glob("*.json"))
+    assert state.job is not None
+    assert state.job.status.value == "completed"
+    assert state.job.result_ref is not None
+    assert "test-worker" in state.job.history[-1].message
+    assert "transcription" in state.job.history[-1].message
+    assert state.balance is not None
+    assert state.balance.available.amount == Decimal("90")
+    assert len(state.balance.reservations) == 1
+    assert state.balance.reservations[0].is_confirmed is True
+    assert any(transaction.transaction_type == TransactionType.CHARGE for transaction in state.transactions)
+    assert list((tmp_path / "results" / "transcription").glob("*.json"))
 
 
 @pytest.mark.asyncio
@@ -219,19 +237,14 @@ async def test_worker_refunds_reservation_on_failure(db_context: DBContext, tmp_
             )
         )
 
-    async with session_factory() as session:
-        repositories = build_messaging_assertion_repositories(session)
+    state = await load_messaging_assertion_state(session_factory, setup)
 
-        saved_job = await repositories.processing_repository.get_by_id(setup.job_id)
-        saved_balance = await repositories.account_balance_repository.get_by_user_id(setup.user_id)
-        transactions = await repositories.billing_transaction_repository.list_by_user_id(setup.user_id)
-
-        assert saved_job is not None
-        assert saved_job.status == ProcessingStatus.FAILED
-        assert saved_balance is not None
-        assert saved_balance.available.amount == Decimal("100")
-        assert saved_balance.reservations == []
-        assert any(transaction.transaction_type == TransactionType.REFUND for transaction in transactions)
+    assert state.job is not None
+    assert state.job.status == ProcessingStatus.FAILED
+    assert state.balance is not None
+    assert state.balance.available.amount == Decimal("100")
+    assert state.balance.reservations == []
+    assert any(transaction.transaction_type == TransactionType.REFUND for transaction in state.transactions)
 
 
 @pytest.mark.asyncio
@@ -274,3 +287,25 @@ async def test_processing_job_repository_persists_video_payload(db_context: DBCo
         assert len(restored_job.operations) == 1
         assert restored_job.operations[0].prompt == "Change the jacket color to red."
         assert restored_job.operations[0].reference_asset_id is not None
+
+
+@pytest.mark.asyncio
+async def test_cancel_processing_job_marks_status_and_refunds_balance(db_context: DBContext) -> None:
+    setup = await seed_transcription_job(
+        db_context.session_factory,
+        user_email="worker-cancel@grotesk.local",
+        model_name="openai/whisper-large-v3-turbo",
+    )
+
+    async with db_context.session_factory() as session:
+        application = build_application(session)
+        await application.cancel_processing_job(CancelProcessingJob(job_id=setup.job_id, user_id=setup.user_id))
+
+    state = await load_messaging_assertion_state(db_context.session_factory, setup)
+
+    assert state.job is not None
+    assert state.job.status == ProcessingStatus.CANCELED
+    assert state.balance is not None
+    assert state.balance.available.amount == Decimal("100")
+    assert state.balance.reservations == []
+    assert any(transaction.transaction_type == TransactionType.REFUND for transaction in state.transactions)

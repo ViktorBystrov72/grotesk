@@ -5,9 +5,11 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+from grotesk.application.billing.dto import BillingTransactionDTO
 from grotesk.application.catalog.dto import ModelProfileDTO, PricingRuleDTO
 from grotesk.application.identity_access.dto import UserDTO
 from grotesk.application.processing.dto import JobHistoryItemDTO, ProcessingJobDetailDTO, ProcessingJobDTO
+from grotesk.domain.billing.model import TransactionType
 from grotesk.domain.catalog.model import Capability, ModelId
 from grotesk.domain.identity_access.model import UserId, UserRole
 from grotesk.domain.processing.model import JobId, JobType, ProcessingStatus
@@ -16,6 +18,7 @@ from grotesk.presentation.api.main import create_app
 
 TEST_USER_ID = UserId(UUID("00000000-0000-0000-0000-000000000111"))
 TEST_JOB_ID = JobId(UUID("00000000-0000-0000-0000-000000000222"))
+TEST_ACTIVE_JOB_ID = JobId(UUID("00000000-0000-0000-0000-000000000223"))
 TEST_MODEL_ID = ModelId(UUID("00000000-0000-0000-0000-000000000333"))
 TEST_PASSWORD_HASH = "test-password-hash"
 
@@ -66,6 +69,11 @@ class MockApplication:
                 raise ValueError("Invalid asset")
             return command_or_query.job_id
 
+        if type_name == "CancelProcessingJob":
+            if command_or_query.job_id not in {TEST_JOB_ID, TEST_ACTIVE_JOB_ID}:
+                raise ValueError("Processing job does not exist.")
+            return command_or_query.job_id
+
         if type_name == "UploadMediaAsset":
             return command_or_query.asset
 
@@ -88,7 +96,22 @@ class MockApplication:
         if type_name == "GetUserTransactionHistory":
             if str(command_or_query.user_id.value) == "00000000-0000-0000-0000-000000000400":
                 raise ValueError("Error getting transactions")
-            return []
+            return [
+                BillingTransactionDTO(
+                    transaction_type=TransactionType.TOP_UP,
+                    amount="100.00",
+                    currency="CREDIT",
+                    created_at=datetime.now(UTC),
+                    related_job_id=None,
+                ),
+                BillingTransactionDTO(
+                    transaction_type=TransactionType.CHARGE,
+                    amount="10.00",
+                    currency="CREDIT",
+                    created_at=datetime.now(UTC),
+                    related_job_id=TEST_JOB_ID,
+                ),
+            ]
 
         if type_name == "GetUserJobHistory":
             if str(command_or_query.user_id.value) == "00000000-0000-0000-0000-000000000400":
@@ -99,6 +122,8 @@ class MockApplication:
                     job_type=JobType.TRANSCRIPTION,
                     status=ProcessingStatus.COMPLETED,
                     created_at=datetime.now(UTC),
+                    source_filename="sample.wav",
+                    model_name="openai/whisper-large-v3-turbo",
                     history=[
                         JobHistoryItemDTO(
                             status=ProcessingStatus.COMPLETED,
@@ -109,6 +134,28 @@ class MockApplication:
             ]
 
         if type_name == "GetUserJobDetails":
+            if command_or_query.job_id == TEST_ACTIVE_JOB_ID:
+                return ProcessingJobDetailDTO(
+                    job_id=TEST_ACTIVE_JOB_ID,
+                    job_type=JobType.TRANSCRIPTION,
+                    status=ProcessingStatus.RUNNING,
+                    created_at=datetime.now(UTC),
+                    source_filename="active.wav",
+                    model_name="openai/whisper-large-v3-turbo",
+                    prompt_text=None,
+                    result_type=None,
+                    result_id=None,
+                    history=[
+                        JobHistoryItemDTO(
+                            status=ProcessingStatus.QUEUED,
+                            message="queued",
+                        ),
+                        JobHistoryItemDTO(
+                            status=ProcessingStatus.RUNNING,
+                            message="running",
+                        ),
+                    ],
+                )
             if command_or_query.job_id != TEST_JOB_ID:
                 raise ValueError("Processing job does not exist.")
             return ProcessingJobDetailDTO(
@@ -116,6 +163,8 @@ class MockApplication:
                 job_type=JobType.TRANSCRIPTION,
                 status=ProcessingStatus.COMPLETED,
                 created_at=datetime.now(UTC),
+                source_filename="sample.wav",
+                model_name="openai/whisper-large-v3-turbo",
                 prompt_text=None,
                 result_type="transcription",
                 result_id=None,
@@ -168,6 +217,9 @@ class MockApplication:
 
     async def get_user_job_detail(self, query):
         return await self(query)
+
+    async def cancel_processing_job(self, command):
+        return await self(command)
 
 
 @pytest.fixture

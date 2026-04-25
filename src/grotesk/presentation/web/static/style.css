@@ -125,6 +125,89 @@ pre {
   overflow: auto;
 }
 
+.transcript-pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.75;
+}
+
+.form-help {
+  margin: 0 0 16px 0;
+  padding: 14px 16px;
+  border: 1px solid #dbe4f0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
+}
+
+.form-help__title {
+  margin: 0 0 8px 0;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.form-help__text {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #4b5563;
+}
+
+.form-help__text:last-child {
+  margin-bottom: 0;
+}
+
+.job-operations {
+  margin-top: 10px;
+}
+
+.job-operations__list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.job-operations__item {
+  display: grid;
+  grid-template-columns: minmax(96px, 116px) 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+}
+
+.job-operations__time {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d4ed8;
+  white-space: nowrap;
+  text-align: center;
+  align-self: center;
+}
+
+.job-operations__prompt {
+  color: #374151;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.form-help code,
+.job-operations__time code {
+  background: #e8eef8;
+  color: #0f172a;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+@media (max-width: 700px) {
+  .job-operations__item {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
+
 .help-muted,
 .auto-refresh-hint {
   font-size: 14px;
@@ -138,6 +221,7 @@ pre {
   color: #1e3a8a;
   padding: 10px 12px;
   border-radius: 8px;
+  margin-top: 16px;
 }
 
 .status-line {
@@ -192,6 +276,12 @@ pre {
   color: #9f1239;
   background: #fff1f2;
   border-color: #fda4af;
+}
+
+.status-pill--canceled {
+  color: #5b21b6;
+  background: #f5f3ff;
+  border-color: #c4b5fd;
 }
 
 .status-help-details {
@@ -319,6 +409,112 @@ summary.status-help-ico:focus {
   overflow: auto;
 }
 
+.job-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.job-header__title {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.job-header__actions {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.danger-button {
+  background: #7f1d1d;
+  color: #fff;
+  border: none;
+}
+
+.danger-button:hover {
+  background: #991b1b;
+}
+
+.secondary-button {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.secondary-button:hover {
+  background: #f9fafb;
+}
+
+.confirm-dialog {
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-width: min(92vw, 420px);
+  width: 100%;
+}
+
+.confirm-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.confirm-dialog__card {
+  position: relative;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.25);
+  padding: 22px 20px 18px;
+}
+
+.confirm-dialog__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.confirm-dialog__close:hover {
+  background: #e5e7eb;
+}
+
+.confirm-dialog__title {
+  margin: 0 0 16px 0;
+  padding-right: 36px;
+  font-size: 20px;
+  color: #111827;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm-dialog__actions form {
+  display: inline-flex;
+}
+
+@media (max-width: 700px) {
+  .job-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .job-header__actions {
+    margin-left: 0;
+  }
+}
+
 .status-stepper {
   list-style: none;
   margin: 0;
@@ -353,6 +549,10 @@ summary.status-help-ico:focus {
 
 .status-step--error::before {
   background: #fecaca;
+}
+
+.status-step--canceled::before {
+  background: #ddd6fe;
 }
 
 .status-step__inner {
@@ -418,6 +618,12 @@ summary.status-help-ico:focus {
   background: #fee2e2;
   border-color: #ef4444;
   color: #b91c1c;
+}
+
+.status-step--canceled .status-step__icon {
+  background: #f5f3ff;
+  border-color: #8b5cf6;
+  color: #6d28d9;
 }
 
 .status-step__title {

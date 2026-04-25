@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Awaitable, Callable, cast
@@ -8,11 +10,12 @@ from uuid import uuid4
 
 from aio_pika import connect_robust
 from aio_pika.abc import AbstractIncomingMessage
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from grotesk.domain.billing.service import BillingService
 from grotesk.domain.common.primitives import EntityId
-from grotesk.domain.processing.model import JobResultRef, ProcessingStatus
+from grotesk.domain.processing.model import JobId, JobResultRef, ProcessingJob, ProcessingStatus
 from grotesk.domain.processing.service import ProcessingService
 from grotesk.infrastructure.db.repositories.billing import (
     AccountBalanceRepositoryImpl,
@@ -28,12 +31,17 @@ from grotesk.infrastructure.messaging.config import MessagingConfig
 from grotesk.infrastructure.messaging.messages import JobSubmittedMessage
 from grotesk.infrastructure.ml.artifacts import ResultArtifactStore
 from grotesk.infrastructure.ml.config import MLConfig
-from grotesk.infrastructure.ml.processor import HuggingFaceJobProcessor, JobProcessor
+from grotesk.infrastructure.ml.processor import JobProcessor
+from grotesk.infrastructure.ml.types import JobExecutionResult, JsonObject
 
 logger = logging.getLogger(__name__)
 
 
 class JobNotReadyError(Exception):
+    pass
+
+
+class JobCanceledError(Exception):
     pass
 
 
@@ -48,7 +56,7 @@ class ProcessingWorker:
         self._session_factory = session_factory
         self._messaging_config = messaging_config
         self._ml_config = MLConfig.from_env()
-        self._processor = processor or HuggingFaceJobProcessor(self._ml_config)
+        self._processor = processor
         self._artifact_store = artifact_store or ResultArtifactStore(self._ml_config.artifact_root)
 
     async def run(self) -> None:
@@ -100,22 +108,26 @@ class ProcessingWorker:
                 logger.info("Job %s is already failed, skipping duplicate delivery.", payload.job_id)
                 return
 
+            if job.status == ProcessingStatus.CANCELED:
+                logger.info("Job %s is already canceled, skipping delivery.", payload.job_id)
+                return
+
             if job.status != ProcessingStatus.RUNNING:
                 job.mark_running()
                 await processing_job_repository.save(job)
                 await uow.commit()
 
             try:
-                media_asset = await media_asset_repository.get_by_id(job.media_asset_id)
-                if media_asset is None:
-                    raise ValueError(f"Media asset {job.media_asset_id.value} does not exist.")
+                await self._wait_for_processing_slot(job.id)
+                execution_result = await self._execute_job(
+                    job=job,
+                    media_asset_repository=media_asset_repository,
+                    model_catalog_repository=model_catalog_repository,
+                )
+                if await self._is_job_canceled(job.id):
+                    logger.info("Job %s was canceled after execution, skipping completion.", payload.job_id)
+                    return
 
-                model_profile = await model_catalog_repository.get_by_id(job.model_id)
-                if model_profile is None:
-                    raise ValueError(f"Model profile {job.model_id.value} does not exist.")
-
-                await asyncio.sleep(self._messaging_config.processing_delay_seconds)
-                execution_result = await self._processor.process(job, media_asset, model_profile)
                 result_identifier = uuid4()
                 artifact_path = self._artifact_store.save(result_identifier, execution_result)
                 completion_message = self._build_completion_message(
@@ -134,7 +146,13 @@ class ProcessingWorker:
                 )
                 await billing_service.confirm_reservation(job.user_id, job.id)
                 await uow.commit()
-            except Exception as error:
+            except JobCanceledError:
+                logger.info("Job %s canceled during execution.", payload.job_id)
+                return
+            except (ValueError, RuntimeError, OSError, SQLAlchemyError) as error:
+                if await self._is_job_canceled(job.id):
+                    logger.info("Job %s was canceled while handling an execution error.", payload.job_id)
+                    return
                 await processing_service.fail_job(
                     payload.job_identifier,
                     f"Worker {self._messaging_config.worker_id} failed: {error}",
@@ -151,19 +169,117 @@ class ProcessingWorker:
             logger.warning("%s Requeueing message.", error)
             await message.nack(requeue=True)
             return
-        except Exception:
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError, RuntimeError, OSError, SQLAlchemyError):
             logger.exception("Worker %s could not process message.", self._messaging_config.worker_id)
             await message.ack()
             return
 
         await message.ack()
 
+    async def _execute_job(
+        self,
+        job: ProcessingJob,
+        media_asset_repository: MediaAssetRepositoryImpl,
+        model_catalog_repository: ModelCatalogRepositoryImpl,
+    ) -> JobExecutionResult:
+        if self._processor is not None:
+            media_asset = await media_asset_repository.get_by_id(job.media_asset_id)
+            if media_asset is None:
+                raise ValueError(f"Media asset {job.media_asset_id.value} does not exist.")
+
+            model_profile = await model_catalog_repository.get_by_id(job.model_id)
+            if model_profile is None:
+                raise ValueError(f"Model profile {job.model_id.value} does not exist.")
+
+            return await self._processor.process(job, media_asset, model_profile)
+
+        return await self._execute_job_in_subprocess(job.id)
+
+    async def _execute_job_in_subprocess(self, job_id: JobId) -> JobExecutionResult:
+        handle = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+        handle.close()
+        result_path = Path(handle.name)
+        process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-m",
+            "grotesk.infrastructure.messaging.job_runner",
+            str(job_id.value),
+            str(result_path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        try:
+            while True:
+                try:
+                    return_code = await asyncio.wait_for(process.wait(), timeout=0.5)
+                    break
+                except asyncio.TimeoutError:
+                    if await self._is_job_canceled(job_id):
+                        await self._terminate_process(process)
+                        raise JobCanceledError(f"Job {job_id.value} canceled by user.")
+
+            stdout, stderr = await process.communicate()
+            if await self._is_job_canceled(job_id):
+                raise JobCanceledError(f"Job {job_id.value} canceled by user.")
+            if return_code != 0:
+                details = (stderr or stdout).decode("utf-8", errors="replace").strip()
+                raise RuntimeError(details or "Job runner exited with a non-zero status.")
+            return self._read_execution_result(result_path)
+        finally:
+            result_path.unlink(missing_ok=True)
+
+    async def _wait_for_processing_slot(self, job_id: JobId) -> None:
+        delay = self._messaging_config.processing_delay_seconds
+        if delay <= 0:
+            if await self._is_job_canceled(job_id):
+                raise JobCanceledError(f"Job {job_id.value} canceled by user.")
+            return
+
+        started_at = asyncio.get_running_loop().time()
+        while True:
+            if await self._is_job_canceled(job_id):
+                raise JobCanceledError(f"Job {job_id.value} canceled by user.")
+            elapsed = asyncio.get_running_loop().time() - started_at
+            if elapsed >= delay:
+                return
+            await asyncio.sleep(min(0.5, delay - elapsed))
+
+    async def _is_job_canceled(self, job_id: JobId) -> bool:
+        async with session_scope(self._session_factory) as session:
+            job = await ProcessingJobRepositoryImpl(session).get_by_id(job_id)
+            return job is not None and job.status == ProcessingStatus.CANCELED
+
+    @staticmethod
+    async def _terminate_process(process: asyncio.subprocess.Process) -> None:
+        if process.returncode is not None:
+            return
+        process.terminate()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=5)
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+        await process.communicate()
+
+    @staticmethod
+    def _read_execution_result(result_path: Path) -> JobExecutionResult:
+        payload = json.loads(result_path.read_text(encoding="utf-8"))
+        artifact_source = payload.get("artifact_source")
+        return JobExecutionResult(
+            result_type=str(payload["result_type"]),
+            artifact_extension=str(payload["artifact_extension"]),
+            history_payload=cast(JsonObject, payload.get("history_payload") or {}),
+            artifact_payload=cast(JsonObject | None, payload.get("artifact_payload")),
+            artifact_source=Path(str(artifact_source)) if artifact_source else None,
+        )
+
     def _build_completion_message(
         self,
         payload: JobSubmittedMessage,
         job_type: str,
         artifact_path: Path,
-        payload_data: dict[str, object],
+        payload_data: JsonObject,
     ) -> str:
         return json.dumps(
             {

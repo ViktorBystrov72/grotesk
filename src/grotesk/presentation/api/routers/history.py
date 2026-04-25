@@ -26,7 +26,7 @@ async def get_transactions(
         transactions = await application.get_user_transaction_history(query)
         return [
             TransactionResponse(
-                id=t.related_job_id or "top-up",
+                id=t.related_job_id.value if t.related_job_id is not None else "top-up",
                 amount=Decimal(t.amount),
                 type=t.transaction_type.value,
                 created_at=t.created_at.isoformat(),

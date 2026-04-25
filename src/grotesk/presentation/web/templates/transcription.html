@@ -3,6 +3,7 @@
 {% block content %}
 <div class="card">
     <h1>Транскрибация аудио</h1>
+    <p>Поддерживаемые форматы: MP3, AAC, OGG, WAV, M4A, FLAC. Перед распознаванием файл автоматически конвертируется в WAV 16 kHz mono.</p>
     <form action="/cabinet/transcription" method="post" enctype="multipart/form-data">
         <select name="model_id" required>
             <option value="">Выберите модель</option>
@@ -10,7 +11,7 @@
                 <option value="{{ model.model_id.value }}">{{ model.name }}</option>
             {% endfor %}
         </select>
-        <input type="file" name="file" accept="audio/*" required>
+        <input type="file" name="file" accept=".mp3,.aac,.ogg,.wav,.m4a,.flac,audio/*" required>
         <button class="primary" type="submit">Запустить</button>
     </form>
 </div>

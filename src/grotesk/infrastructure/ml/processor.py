@@ -7,6 +7,7 @@ from grotesk.domain.media_ingestion.model import MediaAsset
 from grotesk.domain.processing.model import JobType, ProcessingJob
 from grotesk.infrastructure.ml.audio_pipeline import HuggingFaceAudioPipeline
 from grotesk.infrastructure.ml.config import MLConfig
+from grotesk.infrastructure.ml.transcription_formatting import prepare_transcription_artifact
 from grotesk.infrastructure.ml.types import AudioTranscriptionResult, JobExecutionResult, VideoEditResult
 from grotesk.infrastructure.ml.video_pipeline import HuggingFaceVideoPipeline
 
@@ -47,7 +48,7 @@ class HuggingFaceJobProcessor:
             return JobExecutionResult(
                 result_type="transcription",
                 artifact_extension=".json",
-                artifact_payload=transcription_result,
+                artifact_payload=prepare_transcription_artifact(transcription_result),
                 history_payload={
                     "model_name": model_id,
                     "speaker_count": transcription_result.get("speaker_count", 0),

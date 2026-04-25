@@ -21,6 +21,7 @@ class ProcessingStatus(StrEnum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELED = "canceled"
 
 
 @dataclass(frozen=True)
@@ -84,4 +85,8 @@ class ProcessingJob(Entity):
 
     def mark_failed(self, message: str) -> None:
         self.status = ProcessingStatus.FAILED
+        self.history.append(JobHistoryRecord(status=self.status, message=message))
+
+    def mark_canceled(self, message: str = "Job canceled by user") -> None:
+        self.status = ProcessingStatus.CANCELED
         self.history.append(JobHistoryRecord(status=self.status, message=message))

@@ -12,11 +12,31 @@ from grotesk.domain.common.primitives import FileLocation
 from grotesk.domain.identity_access.model import UserId
 from grotesk.domain.media_ingestion.model import MediaAsset, MediaAssetId, MediaType
 from grotesk.infrastructure.ml.config import MLConfig
+from grotesk.infrastructure.ml.transcription_formatting import (
+    build_book_transcript,
+    build_transcript_turns,
+    dump_json_pretty,
+    format_speaker_name,
+)
 from grotesk.main.application import Application
+from grotesk.presentation.filenames import extract_original_upload_name
 
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".aac"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+__all__ = [
+    "build_book_transcript",
+    "build_transcript_turns",
+    "detect_media_type",
+    "dump_json_pretty",
+    "format_speaker_name",
+    "get_media_storage_root",
+    "load_json_artifact",
+    "register_uploaded_media",
+    "resolve_result_artifact_path",
+    "save_upload_file",
+]
 
 
 def get_media_storage_root() -> Path:
@@ -35,10 +55,14 @@ def detect_media_type(filename: str, content_type: str | None = None) -> MediaTy
 
 
 async def save_upload_file(upload_file: UploadFile, media_type: MediaType) -> Path:
-    target_root = get_media_storage_root() / media_type.value
+    target_root = get_media_storage_root() / str(media_type)
     target_root.mkdir(parents=True, exist_ok=True)
-    suffix = Path(upload_file.filename or "").suffix or ".bin"
-    target_path = target_root / f"{uuid4()}{suffix.lower()}"
+    original_name = extract_original_upload_name(upload_file.filename)
+    suffix = Path(original_name or "").suffix or ".bin"
+    if original_name:
+        target_path = target_root / f"{uuid4()}__{original_name}"
+    else:
+        target_path = target_root / f"{uuid4()}{suffix.lower()}"
     content = await upload_file.read()
     await asyncio.to_thread(target_path.write_bytes, content)
     await upload_file.close()

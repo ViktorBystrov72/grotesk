@@ -12,6 +12,10 @@ class MLConfig:
     artifact_root: str
     audio_model_id: str
     speaker_model_id: str
+    audio_max_speakers: int
+    audio_dominant_speaker_ratio: float
+    audio_secondary_speaker_ratio: float
+    audio_short_turn_seconds: float
     video_model_id: str
     device: str
     video_width: int
@@ -31,6 +35,10 @@ class MLConfig:
             artifact_root=artifact_root,
             audio_model_id=os.getenv("HF_AUDIO_MODEL_ID", DEFAULT_AUDIO_MODEL_ID),
             speaker_model_id=os.getenv("HF_SPEAKER_MODEL_ID", DEFAULT_SPEAKER_MODEL_ID),
+            audio_max_speakers=int(os.getenv("HF_AUDIO_MAX_SPEAKERS", "3")),
+            audio_dominant_speaker_ratio=float(os.getenv("HF_AUDIO_DOMINANT_SPEAKER_RATIO", "0.72")),
+            audio_secondary_speaker_ratio=float(os.getenv("HF_AUDIO_SECONDARY_SPEAKER_RATIO", "0.18")),
+            audio_short_turn_seconds=float(os.getenv("HF_AUDIO_SHORT_TURN_SECONDS", "1.8")),
             video_model_id=os.getenv("HF_VIDEO_MODEL_ID", DEFAULT_VIDEO_MODEL_ID),
             device=os.getenv("HF_DEVICE", "cpu"),
             video_width=int(os.getenv("HF_VIDEO_WIDTH", "832")),

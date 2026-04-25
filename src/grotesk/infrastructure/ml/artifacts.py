@@ -18,7 +18,7 @@ class ResultArtifactStore:
 
         if execution_result.artifact_payload is not None:
             target_path.write_text(
-                json.dumps(execution_result.artifact_payload, ensure_ascii=True, indent=2, sort_keys=True),
+                json.dumps(execution_result.artifact_payload, ensure_ascii=False, indent=2, sort_keys=True),
                 encoding="utf-8",
             )
             return target_path

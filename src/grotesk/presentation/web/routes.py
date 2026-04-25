@@ -10,17 +10,22 @@ from fastapi.templating import Jinja2Templates
 
 from grotesk.application.billing.commands import TopUpBalance
 from grotesk.application.billing.queries import GetUserBalance, GetUserTransactionHistory
+from grotesk.application.catalog.dto import ModelProfileDTO
 from grotesk.application.catalog.queries import GetAvailableModels
 from grotesk.application.identity_access.commands import RegisterUser
 from grotesk.application.identity_access.dto import UserDTO
 from grotesk.application.identity_access.queries import GetUserByEmail
-from grotesk.application.processing.commands import SubmitTranscriptionJob, SubmitVideoEditingJob
+from grotesk.application.processing.commands import (
+    CancelProcessingJob,
+    SubmitTranscriptionJob,
+    SubmitVideoEditingJob,
+)
 from grotesk.application.processing.queries import GetUserJobDetails, GetUserJobHistory
 from grotesk.domain.catalog.model import Capability, ModelId
 from grotesk.domain.common.primitives import Money
 from grotesk.domain.identity_access.model import UserId
 from grotesk.domain.media_ingestion.model import MediaType
-from grotesk.domain.processing.model import JobId, TimelineOperation
+from grotesk.domain.processing.model import JobId, ProcessingStatus, TimelineOperation
 from grotesk.main.application import Application
 from grotesk.presentation.api.dependencies import (
     get_application,
@@ -29,12 +34,23 @@ from grotesk.presentation.api.dependencies import (
     logout_user,
 )
 from grotesk.presentation.api.routers.auth import get_password_hash, verify_password
-from grotesk.presentation.helpers import load_json_artifact, register_uploaded_media, resolve_result_artifact_path
+from grotesk.presentation.helpers import (
+    build_book_transcript,
+    load_json_artifact,
+    register_uploaded_media,
+    resolve_result_artifact_path,
+)
 from grotesk.presentation.web.job_statuses import build_status_pipeline
+from grotesk.presentation.web.status_labels import format_processing_status, format_transaction_type
 
 router = APIRouter(include_in_schema=False)
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+ACTIVE_JOB_STATUSES = {
+    ProcessingStatus.PENDING,
+    ProcessingStatus.QUEUED,
+    ProcessingStatus.RUNNING,
+}
 
 
 def setup_web(app: FastAPI) -> None:
@@ -47,6 +63,8 @@ def template_context(request: Request, current_user: UserDTO | None, **kwargs: o
     return {
         "request": request,
         "current_user": current_user,
+        "format_processing_status": format_processing_status,
+        "format_transaction_type": format_transaction_type,
         **kwargs,
     }
 
@@ -55,8 +73,57 @@ def redirect(url: str) -> RedirectResponse:
     return RedirectResponse(url=url, status_code=303)
 
 
-def filter_models_by_capability(models: list[object], capability: Capability) -> list[object]:
+def filter_models_by_capability(models: list[ModelProfileDTO], capability: Capability) -> list[ModelProfileDTO]:
     return [model for model in models if capability in model.capabilities]
+
+
+def parse_time_value(raw_value: str) -> int:
+    value = raw_value.strip()
+    if not value:
+        raise ValueError("пустое значение времени")
+    if ":" not in value:
+        return int(value)
+
+    parts = value.split(":")
+    if len(parts) not in (2, 3):
+        raise ValueError("время должно быть в формате ss, mm:ss или hh:mm:ss")
+    try:
+        numbers = [int(part) for part in parts]
+    except ValueError as error:
+        raise ValueError("время должно содержать только числа") from error
+
+    if any(number < 0 for number in numbers):
+        raise ValueError("время не может быть отрицательным")
+
+    if len(numbers) == 2:
+        minutes, seconds = numbers
+        if seconds >= 60:
+            raise ValueError("секунды должны быть меньше 60")
+        return minutes * 60 + seconds
+
+    hours, minutes, seconds = numbers
+    if minutes >= 60 or seconds >= 60:
+        raise ValueError("минуты и секунды должны быть меньше 60")
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def format_seconds_label(total_seconds: int) -> str:
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes:02d}:{seconds:02d}"
+
+
+def build_operation_rows(operations: list[TimelineOperation]) -> list[dict[str, str]]:
+    return [
+        {
+            "start": format_seconds_label(operation.start_second),
+            "end": format_seconds_label(operation.end_second),
+            "prompt": operation.prompt,
+        }
+        for operation in operations
+    ]
 
 
 def parse_operations_text(operations_text: str) -> tuple[list[TimelineOperation], str | None]:
@@ -69,10 +136,10 @@ def parse_operations_text(operations_text: str) -> tuple[list[TimelineOperation]
         if len(parts) != 3:
             return [], f"Строка {line_number}: используйте формат start|end|prompt"
         try:
-            start_second = int(parts[0])
-            end_second = int(parts[1])
+            start_second = parse_time_value(parts[0])
+            end_second = parse_time_value(parts[1])
         except ValueError:
-            return [], f"Строка {line_number}: start и end должны быть целыми числами"
+            return [], f"Строка {line_number}: время должно быть в формате ss, mm:ss или hh:mm:ss"
         try:
             operations.append(
                 TimelineOperation(
@@ -336,10 +403,10 @@ async def video_editing_page(
 async def video_editing_submit(
     request: Request,
     model_id: Annotated[UUID, Form(...)],
-    prompt_text: Annotated[str, Form(...)],
     file: Annotated[UploadFile, File(...)],
     application: Annotated[Application, Depends(get_application)],
     current_user: Annotated[UserDTO | None, Depends(get_optional_current_user)],
+    prompt_text: Annotated[str, Form()] = "",
     operations_text: Annotated[str, Form()] = "",
 ):
     if current_user is None:
@@ -355,6 +422,20 @@ async def video_editing_submit(
                 current_user,
                 models=filter_models_by_capability(models, Capability.VIDEO_EDITING),
                 error=operations_error,
+                prompt_text=prompt_text,
+                operations_text=operations_text,
+            ),
+            status_code=400,
+        )
+    if not prompt_text.strip() and not operations:
+        return templates.TemplateResponse(
+            request=request,
+            name="video_editing.html",
+            context=template_context(
+                request,
+                current_user,
+                models=filter_models_by_capability(models, Capability.VIDEO_EDITING),
+                error="Укажите общий prompt или хотя бы одну операцию по времени.",
                 prompt_text=prompt_text,
                 operations_text=operations_text,
             ),
@@ -431,8 +512,9 @@ async def job_detail_page(
         return redirect("/cabinet/history")
 
     artifact_path = resolve_result_artifact_path(job.result_type, job.result_id)
-    status_stages = build_status_pipeline(job.status)
-    auto_refresh = job.status.value in ("pending", "queued", "running")
+    result = load_json_artifact(artifact_path)
+    status_stages = build_status_pipeline(job.status, job.history)
+    auto_refresh = job.status in ACTIVE_JOB_STATUSES
     return templates.TemplateResponse(
         request=request,
         name="job_detail.html",
@@ -440,9 +522,28 @@ async def job_detail_page(
             request,
             current_user,
             job=job,
-            result=load_json_artifact(artifact_path),
+            result=result,
+            book_transcript=build_book_transcript(result),
+            operation_rows=build_operation_rows(job.operations),
             artifact_url=f"/jobs/{job.job_id.value}/artifact" if artifact_path is not None else None,
             status_stages=status_stages,
             auto_refresh=auto_refresh,
+            can_cancel=job.status in ACTIVE_JOB_STATUSES,
         ),
     )
+
+
+@router.post("/cabinet/jobs/{job_id}/cancel")
+async def cancel_job_submit(
+    job_id: UUID,
+    application: Annotated[Application, Depends(get_application)],
+    current_user: Annotated[UserDTO | None, Depends(get_optional_current_user)],
+):
+    if current_user is None:
+        return redirect("/login")
+
+    try:
+        await application.cancel_processing_job(CancelProcessingJob(job_id=JobId(job_id), user_id=current_user.user_id))
+    except ValueError:
+        return redirect(f"/cabinet/jobs/{job_id}")
+    return redirect(f"/cabinet/jobs/{job_id}")

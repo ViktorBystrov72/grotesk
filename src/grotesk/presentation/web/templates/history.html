@@ -19,7 +19,11 @@
                     <td>{{ job.created_at.isoformat() if job.created_at else '' }}</td>
                     <td><a href="/cabinet/jobs/{{ job.job_id.value }}">{{ job.job_id.value }}</a></td>
                     <td>{{ job.job_type.value }}</td>
-                    <td>{{ job.status.value }}</td>
+                    <td>
+                        <span class="status-pill status-pill--{{ job.status.value }}">
+                            {{ format_processing_status(job.status) }}
+                        </span>
+                    </td>
                 </tr>
             {% endfor %}
             </tbody>
@@ -44,7 +48,7 @@
             {% for transaction in transactions %}
                 <tr>
                     <td>{{ transaction.created_at.isoformat() }}</td>
-                    <td>{{ transaction.transaction_type.value }}</td>
+                    <td>{{ format_transaction_type(transaction.transaction_type) }}</td>
                     <td>{{ transaction.amount }} {{ transaction.currency }}</td>
                 </tr>
             {% endfor %}

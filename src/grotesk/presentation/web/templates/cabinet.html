@@ -25,7 +25,10 @@
         <table>
             <thead>
             <tr>
+                <th>Время</th>
                 <th>ID</th>
+                <th>Файл</th>
+                <th>Модель</th>
                 <th>Тип</th>
                 <th>Статус</th>
             </tr>
@@ -33,9 +36,16 @@
             <tbody>
             {% for job in jobs %}
                 <tr>
+                    <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") if job.created_at else '' }}</td>
                     <td><a href="/cabinet/jobs/{{ job.job_id.value }}">{{ job.job_id.value }}</a></td>
+                    <td>{{ job.source_filename or '—' }}</td>
+                    <td>{{ job.model_name or '—' }}</td>
                     <td>{{ job.job_type.value }}</td>
-                    <td>{{ job.status.value }}</td>
+                    <td>
+                        <span class="status-pill status-pill--{{ job.status.value }}">
+                            {{ format_processing_status(job.status) }}
+                        </span>
+                    </td>
                 </tr>
             {% endfor %}
             </tbody>

@@ -21,6 +21,8 @@ dependencies = [
     "python-multipart",
     "safetensors",
     "scikit-learn",
+    "silero-vad",
+    "soundfile",
     "sqlalchemy",
     "speechbrain",
     "sentencepiece",

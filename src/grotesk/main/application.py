@@ -14,6 +14,7 @@ from grotesk.application.identity_access.commands import RegisterUserHandler
 from grotesk.application.identity_access.queries import GetUserByEmailHandler, GetUserByIdHandler
 from grotesk.application.media_ingestion.commands import UploadMediaAssetHandler
 from grotesk.application.processing.commands import (
+    CancelProcessingJobHandler,
     SubmitTranscriptionJobHandler,
     SubmitVideoEditingJobHandler,
 )
@@ -36,6 +37,7 @@ class Application:
     # Processing
     submit_transcription_job: SubmitTranscriptionJobHandler
     submit_video_edit_job: SubmitVideoEditingJobHandler
+    cancel_processing_job: CancelProcessingJobHandler
     get_user_job_history: GetUserJobHistoryHandler
     get_user_job_detail: GetUserJobDetailsHandler
 

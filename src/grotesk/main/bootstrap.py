@@ -14,6 +14,7 @@ from grotesk.application.identity_access.commands import RegisterUserHandler
 from grotesk.application.identity_access.queries import GetUserByEmailHandler, GetUserByIdHandler
 from grotesk.application.media_ingestion.commands import UploadMediaAssetHandler
 from grotesk.application.processing.commands import (
+    CancelProcessingJobHandler,
     SubmitTranscriptionJobHandler,
     SubmitVideoEditingJobHandler,
 )
@@ -84,11 +85,24 @@ def build_application(session: AsyncSession) -> Application:
             publisher,
             uow,
         ),
+        cancel_processing_job=CancelProcessingJobHandler(
+            processing_job_repository,
+            billing_service,
+            uow,
+        ),
         approve_top_up=ApproveTopUpHandler(billing_service, publisher, uow),
         top_up_balance=TopUpBalanceHandler(billing_service, publisher, uow),
         debit_balance=DebitBalanceHandler(billing_service, publisher, uow),
         get_user_transaction_history=GetUserTransactionHistoryHandler(billing_transaction_repository),
         get_user_balance=GetUserBalanceHandler(account_balance_repository),
-        get_user_job_history=GetUserJobHistoryHandler(processing_job_repository),
-        get_user_job_detail=GetUserJobDetailsHandler(processing_job_repository),
+        get_user_job_history=GetUserJobHistoryHandler(
+            processing_job_repository,
+            media_asset_repository,
+            model_catalog_repository,
+        ),
+        get_user_job_detail=GetUserJobDetailsHandler(
+            processing_job_repository,
+            media_asset_repository,
+            model_catalog_repository,
+        ),
     )
