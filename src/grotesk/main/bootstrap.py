@@ -9,14 +9,16 @@ from grotesk.application.billing.queries import (
     GetUserBalanceHandler,
     GetUserTransactionHistoryHandler,
 )
+from grotesk.application.catalog.queries import GetAvailableModelsHandler
 from grotesk.application.identity_access.commands import RegisterUserHandler
 from grotesk.application.identity_access.queries import GetUserByEmailHandler, GetUserByIdHandler
 from grotesk.application.media_ingestion.commands import UploadMediaAssetHandler
 from grotesk.application.processing.commands import (
+    CancelProcessingJobHandler,
     SubmitTranscriptionJobHandler,
     SubmitVideoEditingJobHandler,
 )
-from grotesk.application.processing.queries import GetUserJobHistoryHandler
+from grotesk.application.processing.queries import GetUserJobDetailsHandler, GetUserJobHistoryHandler
 from grotesk.domain.billing.service import BillingService
 from grotesk.domain.media_ingestion.service import MediaIngestionService
 from grotesk.infrastructure.db.repositories.billing import (
@@ -29,8 +31,17 @@ from grotesk.infrastructure.db.repositories.media import MediaAssetRepositoryImp
 from grotesk.infrastructure.db.repositories.processing import ProcessingJobRepositoryImpl
 from grotesk.infrastructure.db.repositories.user import UserRepositoryImpl
 from grotesk.infrastructure.db.uow import SQLAlchemyUnitOfWork
+from grotesk.infrastructure.messaging.config import MessagingConfig
+from grotesk.infrastructure.messaging.publisher import RabbitMQEventPublisher
 from grotesk.infrastructure.stubs import InMemoryEventPublisher
 from grotesk.main.application import Application
+
+
+def build_event_publisher():
+    messaging_config = MessagingConfig.from_env()
+    if messaging_config.backend == "rabbitmq":
+        return RabbitMQEventPublisher(messaging_config)
+    return InMemoryEventPublisher()
 
 
 def build_application(session: AsyncSession) -> Application:
@@ -42,7 +53,7 @@ def build_application(session: AsyncSession) -> Application:
     model_catalog_repository = ModelCatalogRepositoryImpl(session)
     processing_job_repository = ProcessingJobRepositoryImpl(session)
 
-    publisher = InMemoryEventPublisher()
+    publisher = build_event_publisher()
     uow = SQLAlchemyUnitOfWork(session)
 
     billing_service = BillingService(
@@ -57,6 +68,7 @@ def build_application(session: AsyncSession) -> Application:
         get_user_by_id=GetUserByIdHandler(user_repository),
         get_user_by_email=GetUserByEmailHandler(user_repository),
         upload_media=UploadMediaAssetHandler(media_ingestion_service, publisher, uow),
+        get_available_models=GetAvailableModelsHandler(model_catalog_repository),
         submit_transcription_job=SubmitTranscriptionJobHandler(
             processing_job_repository,
             media_asset_repository,
@@ -73,10 +85,24 @@ def build_application(session: AsyncSession) -> Application:
             publisher,
             uow,
         ),
+        cancel_processing_job=CancelProcessingJobHandler(
+            processing_job_repository,
+            billing_service,
+            uow,
+        ),
         approve_top_up=ApproveTopUpHandler(billing_service, publisher, uow),
         top_up_balance=TopUpBalanceHandler(billing_service, publisher, uow),
         debit_balance=DebitBalanceHandler(billing_service, publisher, uow),
         get_user_transaction_history=GetUserTransactionHistoryHandler(billing_transaction_repository),
         get_user_balance=GetUserBalanceHandler(account_balance_repository),
-        get_user_job_history=GetUserJobHistoryHandler(processing_job_repository),
+        get_user_job_history=GetUserJobHistoryHandler(
+            processing_job_repository,
+            media_asset_repository,
+            model_catalog_repository,
+        ),
+        get_user_job_detail=GetUserJobDetailsHandler(
+            processing_job_repository,
+            media_asset_repository,
+            model_catalog_repository,
+        ),
     )

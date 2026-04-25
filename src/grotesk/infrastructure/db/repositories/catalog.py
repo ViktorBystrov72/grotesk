@@ -26,6 +26,20 @@ class ModelCatalogRepositoryImpl(SQLAlchemyRepository, ModelCatalogRepository):
             return None
         return model_profile_to_domain(model)
 
+    async def list_active(self) -> list[ModelProfile]:
+        models = (
+            await self._session.scalars(
+                select(ModelProfileModel)
+                .options(
+                    selectinload(ModelProfileModel.capabilities),
+                    selectinload(ModelProfileModel.pricing_rules),
+                )
+                .where(ModelProfileModel.is_active.is_(True))
+                .order_by(ModelProfileModel.name.asc()),
+            )
+        ).all()
+        return [model_profile_to_domain(model) for model in models]
+
     async def save(self, profile: ModelProfile) -> None:
         model = await self._session.scalar(
             select(ModelProfileModel)

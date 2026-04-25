@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TimelineOperationRequest(BaseModel):
@@ -19,7 +19,7 @@ class SubmitVideoEditingRequest(BaseModel):
     media_asset_id: UUID
     model_id: UUID
     prompt_text: str
-    operations: list[TimelineOperationRequest] = []
+    operations: list[TimelineOperationRequest] = Field(default_factory=list)
 
 
 class PredictResponse(BaseModel):

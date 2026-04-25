@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Задача {{ job.job_id.value }}{% endblock %}
+{% block content %}
+{% set last_h = job.history|last if job.history else none %}
+<div class="card">
+    <div class="job-header">
+        <h1 class="job-header__title">Задача {{ job.job_id.value }}</h1>
+        {% if can_cancel %}
+            <div class="job-header__actions">
+                <button type="button" class="danger-button" id="open-cancel-job-dialog">Отменить задачу</button>
+            </div>
+        {% endif %}
+    </div>
+    <p><strong>Тип:</strong> {{ job.job_type.value }}</p>
+    <p><strong>Файл:</strong> {{ job.source_filename or '—' }}</p>
+    <p><strong>Модель:</strong> {{ (result.model_name if result and result.model_name else job.model_name) or '—' }}</p>
+    <div class="status-line">
+        <strong>Текущий статус:</strong>
+        <span class="status-pill status-pill--{{ job.status.value }}">{{ format_processing_status(job.status) }}</span>
+        <details class="status-help-details" id="status-definitions">
+            <summary class="status-help-ico" aria-label="Справка: что значит каждый статус" title="Справка по статусам">?</summary>
+            <div class="status-help-body" role="tooltip">
+                <p class="status-help-title">Статусы</p>
+                <ul class="status-help-list">
+                    <li>Принято (<code>pending</code>) — задача принята API, согласована с биллингом (бронь кредитов).</li>
+                    <li>В очереди (<code>queued</code>) — сообщение в очереди; воркер ещё не начал — ждите <code>running</code>.</li>
+                    <li>Выполняется (<code>running</code>) — воркер выполняет модель. Длительность зависит от файла и нагрузки (часто минуты).</li>
+                    <li>Готово (<code>completed</code>) — успех; артефакт/JSON, бронь списана по правилам.</li>
+                    <li>Ошибка (<code>failed</code>) — сбой воркера/пайплайна; бронь снимается, начисления за успех нет.</li>
+                    <li>Отменена (<code>canceled</code>) — задача отменена пользователем; бронь освобождается, выполнение больше не продолжается.</li>
+                </ul>
+            </div>
+        </details>
+    </div>
+    <script>
+    (function () {
+        var d = document.getElementById("status-definitions");
+        if (!d) return;
+        var t = null;
+        d.addEventListener("mouseenter", function () { clearTimeout(t); d.open = true; });
+        d.addEventListener("mouseleave", function () {
+            t = setTimeout(function () { d.open = false; }, 280);
+        });
+    })();
+    </script>
+    {% if job.status.value in ('failed', 'canceled') %}
+    {% if last_h %}
+    <div class="job-failed-error-box">
+        <div class="job-failed-error-box__label">{% if job.status.value == 'failed' %}Сообщение воркера{% else %}Последнее сообщение{% endif %}</div>
+        <pre class="job-failed-error-text">{{ last_h.message }}</pre>
+    </div>
+    {% endif %}
+    {% endif %}
+    <p><strong>Время:</strong> {{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") if job.created_at else '' }}</p>
+    <p><strong>Длительность:</strong> {% if result and result.duration_seconds is not none %}{{ result.duration_seconds }} сек.{% else %}—{% endif %}</p>
+    {% if can_cancel %}
+        <dialog class="confirm-dialog" id="cancel-job-dialog" aria-labelledby="cancel-job-title">
+            <div class="confirm-dialog__card">
+                <button type="button" class="confirm-dialog__close" id="close-cancel-job-dialog" aria-label="Закрыть">×</button>
+                <h3 class="confirm-dialog__title" id="cancel-job-title">Отменить задачу?</h3>
+                <div class="confirm-dialog__actions">
+                    <button type="button" class="secondary-button" id="dismiss-cancel-job-dialog">Нет</button>
+                    <form method="post" action="/cabinet/jobs/{{ job.job_id.value }}/cancel">
+                        <button type="submit" class="danger-button">Да</button>
+                    </form>
+                </div>
+            </div>
+        </dialog>
+        <script>
+        (function () {
+            var openButton = document.getElementById("open-cancel-job-dialog");
+            var closeButton = document.getElementById("close-cancel-job-dialog");
+            var dismissButton = document.getElementById("dismiss-cancel-job-dialog");
+            var dialog = document.getElementById("cancel-job-dialog");
+            var storageKey = "cancel-job-dialog-open:{{ job.job_id.value }}";
+            if (!openButton || !closeButton || !dismissButton || !dialog) return;
+
+            function rememberOpenState(isOpen) {
+                if (isOpen) {
+                    window.sessionStorage.setItem(storageKey, "1");
+                    return;
+                }
+                window.sessionStorage.removeItem(storageKey);
+            }
+
+            function openDialog() {
+                if (!dialog.open) {
+                    dialog.showModal();
+                }
+                rememberOpenState(true);
+            }
+
+            function closeDialog() {
+                if (dialog.open) {
+                    dialog.close();
+                }
+                rememberOpenState(false);
+            }
+
+            openButton.addEventListener("click", function () {
+                openDialog();
+            });
+            closeButton.addEventListener("click", function () {
+                closeDialog();
+            });
+            dismissButton.addEventListener("click", function () {
+                closeDialog();
+            });
+            dialog.addEventListener("click", function (event) {
+                if (event.target === dialog) {
+                    closeDialog();
+                }
+            });
+            dialog.addEventListener("close", function () {
+                rememberOpenState(false);
+            });
+            if (window.sessionStorage.getItem(storageKey) === "1") {
+                openDialog();
+            }
+        })();
+        </script>
+    {% endif %}
+    {% if job.prompt_text %}
+        <p><strong>Общий prompt:</strong> {{ job.prompt_text }}</p>
+    {% endif %}
+    {% if operation_rows %}
+        <div class="job-operations">
+            <strong>Операции:</strong>
+            <div class="job-operations__list">
+            {% for operation in operation_rows %}
+                <div class="job-operations__item">
+                    <div class="job-operations__time">{{ operation.start }}-{{ operation.end }}</div>
+                    <div class="job-operations__prompt">{{ operation.prompt }}</div>
+                </div>
+            {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+    {% if auto_refresh %}
+    <p class="auto-refresh-hint">Страница <strong>автоматически обновляется каждые 10 сек.</strong>, пока задача не в статусе «готово», «ошибка» или «отменена».</p>
+    <script>
+    (function () {
+        var dialog = document.getElementById("cancel-job-dialog");
+        function scheduleReload() {
+            window.setTimeout(function () {
+                if (dialog && dialog.open) {
+                    scheduleReload();
+                    return;
+                }
+                location.reload();
+            }, 10000);
+        }
+        scheduleReload();
+    })();
+    </script>
+    {% endif %}
+    {% if artifact_url %}
+        <p><a href="{{ artifact_url }}">Скачать артефакт результата</a></p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Ход выполнения</h2>
+    <ol class="status-stepper" aria-label="Этапы задачи">
+        {% for step in status_stages %}
+        <li class="status-step status-step--{{ step.state }}">
+            <div class="status-step__inner">
+                <span class="status-step__icon" {% if step.state == 'active' %}aria-label="Выполняется"{% else %}aria-hidden="true"{% endif %}>
+                    {% if step.state == 'done' %}
+                        ✓
+                    {% elif step.state == 'active' %}
+                        <span class="status-step__spinner" title="В процессе"></span>
+                    {% elif step.state == 'error' %}
+                        ✕
+                    {% elif step.state == 'canceled' %}
+                        ⊘
+                    {% else %}
+                        ○
+                    {% endif %}
+                </span>
+                <div class="status-step__text">
+                    <div class="status-step__title">{{ step.title }} <span class="status-code">({{ step.code }})</span></div>
+                    <p class="status-step__desc">{{ step.description }}</p>
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ol>
+</div>
+
+{% if book_transcript %}
+<div class="card">
+    <h2>Транскрипт</h2>
+    <pre class="transcript-pre">{{ book_transcript }}</pre>
+</div>
+{% endif %}
+{% endblock %}

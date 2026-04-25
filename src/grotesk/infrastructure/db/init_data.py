@@ -15,6 +15,7 @@ from grotesk.infrastructure.db.models.entities import ModelProfileModel
 from grotesk.infrastructure.db.repositories.billing import AccountBalanceRepositoryImpl
 from grotesk.infrastructure.db.repositories.catalog import ModelCatalogRepositoryImpl
 from grotesk.infrastructure.db.repositories.user import UserRepositoryImpl
+from grotesk.infrastructure.ml.config import MLConfig
 from grotesk.main.bootstrap import build_application
 
 
@@ -41,6 +42,7 @@ async def wait_for_database(engine: AsyncEngine, retries: int = 20, delay_second
 async def seed_demo_data(session_factory: async_sessionmaker[AsyncSession]) -> None:
     async with session_factory() as session:
         app = build_application(session)
+        ml_config = MLConfig.from_env()
         user_repository = UserRepositoryImpl(session)
         account_balance_repository = AccountBalanceRepositoryImpl(session)
         model_catalog_repository = ModelCatalogRepositoryImpl(session)
@@ -84,7 +86,7 @@ async def seed_demo_data(session_factory: async_sessionmaker[AsyncSession]) -> N
         default_models = [
             ModelProfile(
                 id=ModelId(uuid4()),
-                name="whisper-diarization-base",
+                name=ml_config.audio_model_id,
                 capabilities=[Capability.TRANSCRIPTION, Capability.DIARIZATION],
                 pricing_rules=[
                     PricingRule(Capability.TRANSCRIPTION, Money(Decimal("3"))),
@@ -93,7 +95,7 @@ async def seed_demo_data(session_factory: async_sessionmaker[AsyncSession]) -> N
             ),
             ModelProfile(
                 id=ModelId(uuid4()),
-                name="video-edit-pro",
+                name=ml_config.video_model_id,
                 capabilities=[Capability.VIDEO_EDITING, Capability.IMAGE_REPLACEMENT, Capability.BODY_RESHAPING],
                 pricing_rules=[
                     PricingRule(Capability.VIDEO_EDITING, Money(Decimal("10"))),

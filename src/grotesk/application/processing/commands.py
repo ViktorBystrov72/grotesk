@@ -11,7 +11,7 @@ from grotesk.domain.media_ingestion.interfaces import MediaAssetRepository
 from grotesk.domain.media_ingestion.model import MediaAssetId, MediaType
 from grotesk.domain.processing.events import TranscriptionJobSubmitted, VideoEditingJobSubmitted
 from grotesk.domain.processing.interfaces import ProcessingJobRepository
-from grotesk.domain.processing.model import JobId, JobType, ProcessingJob
+from grotesk.domain.processing.model import JobId, JobType, ProcessingJob, ProcessingStatus, TimelineOperation
 
 
 @dataclass(frozen=True)
@@ -75,6 +75,8 @@ class SubmitVideoEditingJob(Command[JobId]):
     media_asset_id: MediaAssetId
     model_id: ModelId
     estimated_cost: Money
+    prompt_text: str
+    operations: list[TimelineOperation]
 
 
 class SubmitVideoEditingJobHandler(CommandHandler[SubmitVideoEditingJob, JobId]):
@@ -110,6 +112,8 @@ class SubmitVideoEditingJobHandler(CommandHandler[SubmitVideoEditingJob, JobId])
             model_id=command.model_id,
             job_type=JobType.VIDEO_EDITING,
             estimated_cost=command.estimated_cost,
+            prompt_text=command.prompt_text,
+            operations=list(command.operations),
         )
         job.queue()
 
@@ -118,5 +122,39 @@ class SubmitVideoEditingJobHandler(CommandHandler[SubmitVideoEditingJob, JobId])
 
         events = [VideoEditingJobSubmitted(job_id=command.job_id), *self._billing_service.pull_events()]
         await self._publisher.publish(events)
+        await self._uow.commit()
+        return command.job_id
+
+
+@dataclass(frozen=True)
+class CancelProcessingJob(Command[JobId]):
+    job_id: JobId
+    user_id: UserId
+
+
+class CancelProcessingJobHandler(CommandHandler[CancelProcessingJob, JobId]):
+    def __init__(
+        self,
+        processing_job_repository: ProcessingJobRepository,
+        billing_service: BillingService,
+        uow: UnitOfWork,
+    ) -> None:
+        self._processing_job_repository = processing_job_repository
+        self._billing_service = billing_service
+        self._uow = uow
+
+    async def __call__(self, command: CancelProcessingJob) -> JobId:
+        job = await self._processing_job_repository.get_by_id(command.job_id)
+        if job is None or job.user_id != command.user_id:
+            raise ValueError("Processing job does not exist.")
+
+        if job.status == ProcessingStatus.CANCELED:
+            return command.job_id
+        if job.status in (ProcessingStatus.COMPLETED, ProcessingStatus.FAILED):
+            raise ValueError("Можно отменить только активную задачу.")
+
+        job.mark_canceled()
+        await self._processing_job_repository.save(job)
+        await self._billing_service.release_reservation(job.user_id, job.id)
         await self._uow.commit()
         return command.job_id

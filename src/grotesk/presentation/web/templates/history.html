@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}История{% endblock %}
+{% block content %}
+<div class="card">
+    <h1>История задач</h1>
+    {% if jobs %}
+        <table>
+            <thead>
+            <tr>
+                <th>Дата</th>
+                <th>ID</th>
+                <th>Тип</th>
+                <th>Статус</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for job in jobs %}
+                <tr>
+                    <td>{{ job.created_at.isoformat() if job.created_at else '' }}</td>
+                    <td><a href="/cabinet/jobs/{{ job.job_id.value }}">{{ job.job_id.value }}</a></td>
+                    <td>{{ job.job_type.value }}</td>
+                    <td>
+                        <span class="status-pill status-pill--{{ job.status.value }}">
+                            {{ format_processing_status(job.status) }}
+                        </span>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>История задач пуста.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>История списаний и пополнений</h2>
+    {% if transactions %}
+        <table>
+            <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Тип</th>
+                <th>Сумма</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for transaction in transactions %}
+                <tr>
+                    <td>{{ transaction.created_at.isoformat() }}</td>
+                    <td>{{ format_transaction_type(transaction.transaction_type) }}</td>
+                    <td>{{ transaction.amount }} {{ transaction.currency }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Транзакций пока нет.</p>
+    {% endif %}
+</div>
+{% endblock %}

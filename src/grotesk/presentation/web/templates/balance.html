@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Баланс{% endblock %}
+{% block content %}
+<div class="card">
+    <h1>Баланс</h1>
+    <p>Текущий баланс: <strong>{{ balance }}</strong> кредитов</p>
+    <form action="/cabinet/balance" method="post">
+        <input type="number" min="1" step="1" name="amount" placeholder="Сумма пополнения" required>
+        <button class="primary" type="submit">Пополнить</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>История транзакций</h2>
+    {% if transactions %}
+        <table>
+            <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Тип</th>
+                <th>Сумма</th>
+                <th>Job</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for transaction in transactions %}
+                <tr>
+                    <td>{{ transaction.created_at.isoformat() }}</td>
+                    <td>{{ format_transaction_type(transaction.transaction_type) }}</td>
+                    <td>{{ transaction.amount }} {{ transaction.currency }}</td>
+                    <td>
+                        {% if transaction.related_job_id %}
+                            <a href="/cabinet/jobs/{{ transaction.related_job_id.value }}">{{ transaction.related_job_id.value }}</a>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Транзакций пока нет.</p>
+    {% endif %}
+</div>
+{% endblock %}

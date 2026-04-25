@@ -1,3 +1,6 @@
+from typing import Any, cast
+from uuid import UUID
+
 from grotesk.domain.billing.model import (
     AccountBalance,
     BillingTransaction,
@@ -10,7 +13,7 @@ from grotesk.domain.catalog.model import ModelId, ModelProfile, PricingRule
 from grotesk.domain.common.primitives import EntityId, FileLocation, Money
 from grotesk.domain.identity_access.model import Credential, Email, PasswordHash, User, UserId
 from grotesk.domain.media_ingestion.model import AttachmentAsset, MediaAsset, MediaAssetId
-from grotesk.domain.processing.model import JobHistoryRecord, JobId, JobResultRef, ProcessingJob
+from grotesk.domain.processing.model import JobHistoryRecord, JobId, JobResultRef, ProcessingJob, TimelineOperation
 from grotesk.infrastructure.db.models.entities import (
     AccountBalanceModel,
     BillingTransactionModel,
@@ -118,6 +121,8 @@ def processing_job_to_domain(model: ProcessingJobModel) -> ProcessingJob:
     if model.result_type and model.result_id:
         result_ref = JobResultRef(result_type=model.result_type, result_id=EntityId(model.result_id))
 
+    operations_payload = cast(list[dict[str, Any]], model.operations_payload or [])
+
     return ProcessingJob(
         id=JobId(model.id),
         user_id=UserId(model.user_id),
@@ -128,5 +133,17 @@ def processing_job_to_domain(model: ProcessingJobModel) -> ProcessingJob:
         status=model.status,
         created_at=model.created_at,
         result_ref=result_ref,
+        prompt_text=model.prompt_text,
+        operations=[
+            TimelineOperation(
+                start_second=int(cast(int | float | str, operation["start_second"])),
+                end_second=int(cast(int | float | str, operation["end_second"])),
+                prompt=str(operation["prompt"]),
+                reference_asset_id=MediaAssetId(UUID(str(operation["reference_asset_id"])))
+                if operation.get("reference_asset_id")
+                else None,
+            )
+            for operation in operations_payload
+        ],
         history=[history_record_to_domain(record) for record in model.history],
     )
