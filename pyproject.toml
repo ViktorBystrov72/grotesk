@@ -1,6 +1,6 @@
 [project]
 name = "grotesk"
-version = "0.6.0"
+version = "0.7.0"
 description = "ML media service"
 requires-python = ">=3.12"
 dependencies = [
@@ -37,6 +37,7 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "pytest-cov",
     "ruff",
 ]
 
@@ -53,12 +54,22 @@ where = ["src"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "--cov=src/grotesk --cov-report=term-missing"
 filterwarnings = [
     "ignore:'crypt' is deprecated and slated for removal in Python 3\\.13:DeprecationWarning",
     "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
     "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
     "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
 ]
+
+[tool.coverage.run]
+branch = true
+source = ["src/grotesk"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 90
 
 [tool.ruff]
 line-length = 120

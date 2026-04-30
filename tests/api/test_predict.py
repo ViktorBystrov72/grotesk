@@ -85,6 +85,19 @@ async def test_submit_video_editing_invalid_asset(client):
 
 
 @pytest.mark.asyncio
+async def test_submit_video_editing_without_user_context_returns_unauthorized(client):
+    response = await client.post(
+        "/predict/video-editing",
+        json={
+            "media_asset_id": "00000000-0000-0000-0000-000000000002",
+            "model_id": "00000000-0000-0000-0000-000000000003",
+            "prompt_text": "Make it cooler",
+        },
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_submit_video_editing_invalid_uuid(client):
     response = await client.post(
         "/predict/video-editing",
