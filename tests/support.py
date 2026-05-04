@@ -28,6 +28,7 @@ class UserBalanceRepositories:
 @dataclass(frozen=True)
 class MessagingSeedRepositories:
     account_balance_repository: AccountBalanceRepositoryImpl
+    billing_transaction_repository: BillingTransactionRepositoryImpl
     user_repository: UserRepositoryImpl
     media_repository: MediaAssetRepositoryImpl
     model_repository: ModelCatalogRepositoryImpl
@@ -51,6 +52,7 @@ def build_user_balance_repositories(session: AsyncSession) -> UserBalanceReposit
 def build_messaging_seed_repositories(session: AsyncSession) -> MessagingSeedRepositories:
     return MessagingSeedRepositories(
         account_balance_repository=AccountBalanceRepositoryImpl(session),
+        billing_transaction_repository=BillingTransactionRepositoryImpl(session),
         user_repository=UserRepositoryImpl(session),
         media_repository=MediaAssetRepositoryImpl(session),
         model_repository=ModelCatalogRepositoryImpl(session),

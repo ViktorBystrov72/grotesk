@@ -7,7 +7,13 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from grotesk.application.processing.commands import CancelProcessingJob
-from grotesk.domain.billing.model import AccountBalance, BillingTransaction, CreditReservation, TransactionType
+from grotesk.domain.billing.model import (
+    AccountBalance,
+    BillingTransaction,
+    CreditReservation,
+    TransactionId,
+    TransactionType,
+)
 from grotesk.domain.catalog.model import Capability, ModelId, ModelProfile, PricingRule
 from grotesk.domain.common.primitives import FileLocation, Money
 from grotesk.domain.identity_access.model import Credential, Email, PasswordHash, User, UserId, UserRole
@@ -93,6 +99,15 @@ async def seed_transcription_job(
                 user_id=setup.user_id,
                 available=Money(reserved_balance),
                 reservations=[CreditReservation(job_id=setup.job_id, amount=Money(reservation_amount))],
+            )
+        )
+        await repositories.billing_transaction_repository.add(
+            BillingTransaction(
+                id=TransactionId(uuid4()),
+                user_id=setup.user_id,
+                amount=Money(reservation_amount),
+                transaction_type=TransactionType.RESERVATION,
+                related_job_id=setup.job_id,
             )
         )
         await repositories.media_repository.add(
@@ -203,13 +218,21 @@ async def test_worker_processes_job_and_confirms_reservation(db_context: DBConte
     assert state.job is not None
     assert state.job.status.value == "completed"
     assert state.job.result_ref is not None
+    assert [record.status for record in state.job.history] == [
+        ProcessingStatus.QUEUED,
+        ProcessingStatus.RUNNING,
+        ProcessingStatus.COMPLETED,
+    ]
     assert "test-worker" in state.job.history[-1].message
     assert "transcription" in state.job.history[-1].message
     assert state.balance is not None
     assert state.balance.available.amount == Decimal("90")
     assert len(state.balance.reservations) == 1
     assert state.balance.reservations[0].is_confirmed is True
-    assert any(transaction.transaction_type == TransactionType.CHARGE for transaction in state.transactions)
+    assert {transaction.transaction_type for transaction in state.transactions} == {
+        TransactionType.CHARGE,
+        TransactionType.RESERVATION,
+    }
     assert list((tmp_path / "results" / "transcription").glob("*.json"))
 
 
@@ -241,10 +264,18 @@ async def test_worker_refunds_reservation_on_failure(db_context: DBContext, tmp_
 
     assert state.job is not None
     assert state.job.status == ProcessingStatus.FAILED
+    assert [record.status for record in state.job.history] == [
+        ProcessingStatus.QUEUED,
+        ProcessingStatus.RUNNING,
+        ProcessingStatus.FAILED,
+    ]
     assert state.balance is not None
     assert state.balance.available.amount == Decimal("100")
     assert state.balance.reservations == []
-    assert any(transaction.transaction_type == TransactionType.REFUND for transaction in state.transactions)
+    assert {transaction.transaction_type for transaction in state.transactions} == {
+        TransactionType.REFUND,
+        TransactionType.RESERVATION,
+    }
 
 
 @pytest.mark.asyncio
@@ -305,7 +336,14 @@ async def test_cancel_processing_job_marks_status_and_refunds_balance(db_context
 
     assert state.job is not None
     assert state.job.status == ProcessingStatus.CANCELED
+    assert [record.status for record in state.job.history] == [
+        ProcessingStatus.QUEUED,
+        ProcessingStatus.CANCELED,
+    ]
     assert state.balance is not None
     assert state.balance.available.amount == Decimal("100")
     assert state.balance.reservations == []
-    assert any(transaction.transaction_type == TransactionType.REFUND for transaction in state.transactions)
+    assert {transaction.transaction_type for transaction in state.transactions} == {
+        TransactionType.REFUND,
+        TransactionType.RESERVATION,
+    }

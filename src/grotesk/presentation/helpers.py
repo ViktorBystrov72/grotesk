@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import subprocess
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -33,6 +34,7 @@ __all__ = [
     "format_speaker_name",
     "get_media_storage_root",
     "load_json_artifact",
+    "probe_media_duration_seconds",
     "register_uploaded_media",
     "resolve_result_artifact_path",
     "save_upload_file",
@@ -84,6 +86,37 @@ def load_json_artifact(artifact_path: Path | None) -> dict[str, Any] | None:
     if artifact_path is None or artifact_path.suffix.lower() != ".json" or not artifact_path.exists():
         return None
     return json.loads(artifact_path.read_text(encoding="utf-8"))
+
+
+def probe_media_duration_seconds(storage_key: str | None) -> float | None:
+    if storage_key is None:
+        return None
+    media_path = Path(storage_key)
+    if not media_path.exists():
+        return None
+
+    try:
+        completed_process = subprocess.run(
+            [
+                MLConfig.from_env().ffprobe_binary,
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(media_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        duration = float(completed_process.stdout.strip())
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+    return duration if duration >= 0 else None
 
 
 async def register_uploaded_media(

@@ -35,3 +35,4 @@ class ProcessingJobDetailDTO:
     result_id: UUID | None
     history: list[JobHistoryItemDTO]
     operations: list[TimelineOperation] = field(default_factory=list)
+    source_storage_key: str | None = None

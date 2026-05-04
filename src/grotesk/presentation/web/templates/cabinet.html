@@ -20,11 +20,42 @@
 </div>
 
 <div class="card">
-    <h2>Последние задачи</h2>
+    <div class="section-header">
+        <div>
+            <h2>Последние задачи</h2>
+            <p class="help-muted">Показано {{ jobs|length }} из {{ total_jobs }} задач.</p>
+        </div>
+        <div class="pagination-controls" aria-label="Навигация по последним задачам">
+            <form class="inline-form pagination-limit-form" method="get" action="/cabinet">
+                <label for="job-limit">Показывать</label>
+                <select id="job-limit" name="job_limit" onchange="this.form.submit()">
+                    {% for option in job_limit_options %}
+                        <option value="{{ option }}" {% if option == selected_job_limit %}selected{% endif %}>
+                            {{ option }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+            <div class="pagination-arrows">
+                {% if has_previous_job_page %}
+                    <a class="pagination-arrow" href="/cabinet?job_limit={{ selected_job_limit }}&job_page={{ previous_job_page }}" aria-label="Предыдущая страница задач">‹</a>
+                {% else %}
+                    <span class="pagination-arrow pagination-arrow--disabled" aria-disabled="true">‹</span>
+                {% endif %}
+                <span class="pagination-page">{{ selected_job_page }} / {{ total_job_pages }}</span>
+                {% if has_next_job_page %}
+                    <a class="pagination-arrow" href="/cabinet?job_limit={{ selected_job_limit }}&job_page={{ next_job_page }}" aria-label="Следующая страница задач">›</a>
+                {% else %}
+                    <span class="pagination-arrow pagination-arrow--disabled" aria-disabled="true">›</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
     {% if jobs %}
         <table>
             <thead>
             <tr>
+                <th>№</th>
                 <th>Время</th>
                 <th>ID</th>
                 <th>Файл</th>
@@ -36,6 +67,7 @@
             <tbody>
             {% for job in jobs %}
                 <tr>
+                    <td>{{ total_jobs - ((selected_job_page - 1) * selected_job_limit) - loop.index0 }}</td>
                     <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") if job.created_at else '' }}</td>
                     <td><a href="/cabinet/jobs/{{ job.job_id.value }}">{{ job.job_id.value }}</a></td>
                     <td>{{ job.source_filename or '—' }}</td>
@@ -54,4 +86,50 @@
         <p>Задач пока нет.</p>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const STORAGE_KEY = 'cabinet_job_limit';
+    const DEFAULT_LIMIT = 10;
+    const select = document.getElementById('job-limit');
+
+    if (!select) {
+        return;
+    }
+
+    const savedLimit = localStorage.getItem(STORAGE_KEY);
+    let normalizedLimit = DEFAULT_LIMIT;
+    if (savedLimit) {
+        const parsedLimit = parseInt(savedLimit, 10);
+        if (!isNaN(parsedLimit)) {
+            normalizedLimit = parsedLimit;
+        }
+    }
+
+    const optionExists = Array.from(select.options).some(function(opt) {
+        return parseInt(opt.value, 10) === normalizedLimit;
+    });
+
+    if (optionExists) {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.has('job_limit')) {
+            params.set('job_limit', String(normalizedLimit));
+            if (!params.has('job_page')) {
+                params.set('job_page', '1');
+            }
+            window.location.replace(window.location.pathname + '?' + params.toString());
+            return;
+        }
+        if (select.value !== String(normalizedLimit)) {
+            select.value = String(normalizedLimit);
+        }
+    }
+
+    select.addEventListener('change', function() {
+        localStorage.setItem(STORAGE_KEY, select.value);
+    });
+})();
+</script>
 {% endblock %}

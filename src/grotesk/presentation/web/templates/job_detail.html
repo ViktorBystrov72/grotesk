@@ -13,6 +13,8 @@
     </div>
     <p><strong>Тип:</strong> {{ job.job_type.value }}</p>
     <p><strong>Файл:</strong> {{ job.source_filename or '—' }}</p>
+    <p><strong>Длительность:</strong> {{ duration_label }}</p>
+    <p><strong>Время:</strong> {{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") if job.created_at else '' }}</p>
     <p><strong>Модель:</strong> {{ (result.model_name if result and result.model_name else job.model_name) or '—' }}</p>
     <div class="status-line">
         <strong>Текущий статус:</strong>
@@ -51,8 +53,6 @@
     </div>
     {% endif %}
     {% endif %}
-    <p><strong>Время:</strong> {{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") if job.created_at else '' }}</p>
-    <p><strong>Длительность:</strong> {% if result and result.duration_seconds is not none %}{{ result.duration_seconds }} сек.{% else %}—{% endif %}</p>
     {% if can_cancel %}
         <dialog class="confirm-dialog" id="cancel-job-dialog" aria-labelledby="cancel-job-title">
             <div class="confirm-dialog__card">

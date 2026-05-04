@@ -49,6 +49,25 @@ async def test_login_success(client):
 
 
 @pytest.mark.asyncio
+async def test_logout_clears_authenticated_session(client):
+    original_verify = auth.verify_password
+    auth.verify_password = lambda p, h: True
+
+    try:
+        login_response = await client.post("/auth/login", json={"email": "test@example.com", "password": "password123"})
+    finally:
+        auth.verify_password = original_verify
+    assert login_response.status_code == 200
+
+    logout_response = await client.post("/auth/logout")
+    assert logout_response.status_code == 200
+    assert logout_response.json()["status"] == "success"
+
+    me_response = await client.get("/auth/me")
+    assert me_response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_login_wrong_credentials(client):
     response = await client.post("/auth/login", json={"email": "test@example.com", "password": "wrong"})
     assert response.status_code == 401
