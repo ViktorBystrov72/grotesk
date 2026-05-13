@@ -85,4 +85,7 @@ async def download_job_artifact(
                 json.dumps(prepare_transcription_artifact(payload), ensure_ascii=False, indent=2, sort_keys=True),
                 encoding="utf-8",
             )
-    return FileResponse(path=artifact_path, filename=artifact_path.name)
+    media_type = None
+    if artifact_path.suffix.lower() == ".mp4":
+        media_type = "video/mp4"
+    return FileResponse(path=artifact_path, filename=artifact_path.name, media_type=media_type)

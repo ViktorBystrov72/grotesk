@@ -1,6 +1,6 @@
 [project]
 name = "grotesk"
-version = "0.6.0"
+version = "0.9.0"
 description = "ML media service"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,9 +12,12 @@ dependencies = [
     "bcrypt",
     "diffusers @ git+https://github.com/huggingface/diffusers.git",
     "fastapi",
+    "ftfy",
     "ffmpeg-python",
     "greenlet",
     "httpx",
+    "imageio",
+    "imageio-ffmpeg",
     "itsdangerous",
     "jinja2",
     "pydantic",

@@ -23,6 +23,7 @@ class MLConfig:
     video_fps: int
     video_max_frames: int
     video_guidance_scale: float
+    video_num_inference_steps: int
     ffmpeg_binary: str
     ffprobe_binary: str
 
@@ -46,6 +47,7 @@ class MLConfig:
             video_fps=int(os.getenv("HF_VIDEO_FPS", "24")),
             video_max_frames=int(os.getenv("HF_VIDEO_MAX_FRAMES", "81")),
             video_guidance_scale=float(os.getenv("HF_VIDEO_GUIDANCE_SCALE", "5.0")),
+            video_num_inference_steps=int(os.getenv("HF_VIDEO_NUM_INFERENCE_STEPS", "50")),
             ffmpeg_binary=os.getenv("FFMPEG_BINARY", "ffmpeg"),
             ffprobe_binary=os.getenv("FFPROBE_BINARY", "ffprobe"),
         )

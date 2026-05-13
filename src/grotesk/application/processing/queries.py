@@ -95,4 +95,5 @@ class GetUserJobDetailsHandler(QueryHandler[GetUserJobDetails, ProcessingJobDeta
             history=[JobHistoryItemDTO(status=record.status, message=record.message) for record in job.history],
             operations=job.operations,
             source_storage_key=media_asset.location.storage_key if media_asset is not None else None,
+            video_output=job.video_output,
         )

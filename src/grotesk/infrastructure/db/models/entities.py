@@ -220,6 +220,11 @@ class ProcessingJobModel(Base):
     )
     result_type: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
     result_id: Mapped[UUID | None] = mapped_column(sa.Uuid(as_uuid=True), nullable=True)
+    video_output_width: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    video_output_height: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    video_output_fps: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    video_output_max_frames: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    video_output_guidance_scale: Mapped[Decimal | None] = mapped_column(sa.Numeric(8, 4), nullable=True)
 
     history: Mapped[list["JobHistoryRecordModel"]] = relationship(
         back_populates="job",

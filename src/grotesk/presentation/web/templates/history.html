@@ -16,7 +16,7 @@
             <tbody>
             {% for job in jobs %}
                 <tr>
-                    <td>{{ job.created_at.isoformat() if job.created_at else '' }}</td>
+                    <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") if job.created_at else '' }}</td>
                     <td><a href="/cabinet/jobs/{{ job.job_id.value }}">{{ job.job_id.value }}</a></td>
                     <td>{{ job.job_type.value }}</td>
                     <td>
@@ -47,7 +47,7 @@
             <tbody>
             {% for transaction in transactions %}
                 <tr>
-                    <td>{{ transaction.created_at.isoformat() }}</td>
+                    <td>{{ transaction.created_at.strftime("%Y-%m-%d %H:%M:%S") if transaction.created_at else '' }}</td>
                     <td>{{ format_transaction_type(transaction.transaction_type) }}</td>
                     <td>{{ transaction.amount }} {{ transaction.currency }}</td>
                 </tr>

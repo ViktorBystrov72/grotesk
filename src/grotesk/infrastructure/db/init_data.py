@@ -15,6 +15,7 @@ from grotesk.infrastructure.db.models.entities import ModelProfileModel
 from grotesk.infrastructure.db.repositories.billing import AccountBalanceRepositoryImpl
 from grotesk.infrastructure.db.repositories.catalog import ModelCatalogRepositoryImpl
 from grotesk.infrastructure.db.repositories.user import UserRepositoryImpl
+from grotesk.infrastructure.db.schema_compat import ensure_processing_jobs_video_columns
 from grotesk.infrastructure.ml.config import MLConfig
 from grotesk.main.bootstrap import build_application
 
@@ -116,4 +117,5 @@ async def seed_demo_data(session_factory: async_sessionmaker[AsyncSession]) -> N
 async def initialize_database(engine: AsyncEngine, session_factory: async_sessionmaker[AsyncSession]) -> None:
     await wait_for_database(engine)
     await create_schema(engine)
+    await ensure_processing_jobs_video_columns(engine)
     await seed_demo_data(session_factory)

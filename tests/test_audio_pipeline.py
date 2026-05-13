@@ -24,6 +24,7 @@ def test_audio_pipeline_transcribe_uses_raw_waveform(monkeypatch, tmp_path) -> N
         video_fps=24,
         video_max_frames=81,
         video_guidance_scale=5.0,
+        video_num_inference_steps=50,
         ffmpeg_binary="ffmpeg",
         ffprobe_binary="ffprobe",
     )
@@ -80,6 +81,7 @@ def test_audio_pipeline_assigns_speakers_from_diarization_segments(tmp_path, mon
         video_fps=24,
         video_max_frames=81,
         video_guidance_scale=5.0,
+        video_num_inference_steps=50,
         ffmpeg_binary="ffmpeg",
         ffprobe_binary="ffprobe",
     )
@@ -127,6 +129,7 @@ def test_audio_pipeline_limits_cluster_count_and_collapses_minor_speakers(tmp_pa
         video_fps=24,
         video_max_frames=81,
         video_guidance_scale=5.0,
+        video_num_inference_steps=50,
         ffmpeg_binary="ffmpeg",
         ffprobe_binary="ffprobe",
     )
@@ -164,6 +167,7 @@ def test_audio_pipeline_merges_short_intrusive_turns(tmp_path) -> None:
         video_fps=24,
         video_max_frames=81,
         video_guidance_scale=5.0,
+        video_num_inference_steps=50,
         ffmpeg_binary="ffmpeg",
         ffprobe_binary="ffprobe",
     )

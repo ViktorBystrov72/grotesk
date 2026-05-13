@@ -36,6 +36,17 @@ class JobResultRef(ValueObject):
 
 
 @dataclass(frozen=True)
+class VideoEditJobOutput(ValueObject):
+    """Параметры выходного клипа для задачи VIDEO_EDITING (разрешение, fps, ограничение кадров, guidance)."""
+
+    width: int
+    height: int
+    fps: int
+    max_frames: int
+    guidance_scale: float
+
+
+@dataclass(frozen=True)
 class TimelineOperation(ValueObject):
     start_second: int
     end_second: int
@@ -69,6 +80,7 @@ class ProcessingJob(Entity):
     prompt_text: str | None = None
     operations: list[TimelineOperation] = field(default_factory=list)
     history: list[JobHistoryRecord] = field(default_factory=list)
+    video_output: VideoEditJobOutput | None = None
 
     def queue(self) -> None:
         self.status = ProcessingStatus.QUEUED

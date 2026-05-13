@@ -9,13 +9,54 @@
         <p class="form-help__text"><strong>Общий prompt</strong> задаёт общий стиль и контекст для всех операций. <strong>Операции по времени</strong> задают точечные изменения на конкретных отрезках видео.</p>
         <p class="form-help__text">Если нужен только точечный монтаж по таймкодам, общий prompt можно оставить пустым.</p>
     </div>
+
     <form action="/cabinet/video-editing" method="post" enctype="multipart/form-data">
-        <select name="model_id" required>
-            <option value="">Выберите модель</option>
-            {% for model in models %}
-                <option value="{{ model.model_id.value }}">{{ model.name }}</option>
+
+        <h2 class="video-output-params__heading">Выходное видео</h2>
+        <p class="form-help__text">Параметры ниже задают формат клипа после отработки пайплайна (разрешение, длительность куска одного прохода, «силу следования тексту»). Значения ширины/высоты и длины по времени подобраны под ограничения пространственного и временного VAE модели Wan в Lucy Edit.</p>
+
+        <label for="video-width">Ширина (VIDEO_WIDTH)</label>
+        <select id="video-width" name="video_width" aria-label="Ширина выходного видео" required>
+            {% for w in video_width_options %}
+                <option value="{{ w }}"{% if w == video_form.width %} selected{% endif %}>{{ w }} px</option>
             {% endfor %}
         </select>
+        <p class="form-help__text"><strong>Ширина кадра</strong> — сколько пикселей по горизонтали будет в сохранённом видео. Больше ширина → больше детализации и текстур, но дольше инференс и выше расход памяти (VRAM). Число в списке кратно {{ spatial_align }}: так устроено пространственное сжатие VAE; иначе возможны ошибки пайплайна или артефакты выравнивания.</p>
+
+        <label for="video-height">Высота (VIDEO_HEIGHT)</label>
+        <select id="video-height" name="video_height" aria-label="Высота выходного видео" required>
+            {% for h in video_height_options %}
+                <option value="{{ h }}"{% if h == video_form.height %} selected{% endif %}>{{ h }} px</option>
+            {% endfor %}
+        </select>
+        <p class="form-help__text"><strong>Высота кадра</strong> — число строк пикселей по вертикали; вместе с шириной задаёт общую «тяжесть» кадра для модели. Те же ограничения кратности {{ spatial_align }}. Для экономии времени имеет смысл не раздувать оба измерения, если исходник низкий по разрешению.</p>
+
+        <label for="video-fps">Частота кадров (VIDEO_FPS)</label>
+        <select id="video-fps" name="video_fps" aria-label="Частота кадров выходного видео" required>
+            {% for fps in video_fps_options %}
+                <option value="{{ fps }}"{% if fps == video_form.fps %} selected{% endif %}>{{ fps }} к/с</option>
+            {% endfor %}
+        </select>
+        <p class="form-help__text"><strong>FPS</strong> — сколько кадров в секунду в сохранённом MP4 при заданном числе кадров задаёт фактическую длину фрагмента (примерно: кадры ÷ FPS). Выше FPS → плавнее движение при той же длительности, но каждая секунда «весит» больше кадров для модели. Ниже FPS — экономия времени и нагрузки, иногда более «выразительное» по кадрам движение.</p>
+
+        <label for="video-max-frames">Максимум кадров (VIDEO_MAX_FRAMES)</label>
+        <select id="video-max-frames" name="video_max_frames" aria-label="Максимальное число кадров за проход" required>
+            {% for n in video_max_frames_options %}
+                <option value="{{ n }}"{% if n == video_form.max_frames %} selected{% endif %}>{{ n }} кадров</option>
+            {% endfor %}
+        </select>
+        <p class="form-help__text"><strong>Число кадров за один проход модели</strong> — ограничивает, сколько кадров из фрагмента подаются в диффузию за раз (чанк времени): больше кадров → лучше согласованность длинного движения и контекста, но резко дороже по времени и памяти. Список выбран так, чтобы <code>(число кадров − 1)</code> делилось на {{ temporal_frame_rule }} — это временной шаг VAE; без этого возможны ошибки выравнивания по времени.</p>
+
+        <label for="video-guidance-scale">Guidance scale (VIDEO_GUIDANCE_SCALE)</label>
+        <input id="video-guidance-scale" name="video_guidance_scale" type="number" min="1" max="20" step="any" required value="{{ video_form.guidance_scale }}">
+        <p class="form-help__text"><strong>Classifier-free guidance scale</strong> — насколько жёстко результат привязан к текстам (общий prompt и подсказки операций): выше значение → модель старается буквальнее выполнить формулировки, возможны переусиленные цвета/детали и менее «естественное» поведение; ниже → больше свободы и плавность, но меньше точность к тексту. Диапазон на форме 1.0–20.0; по умолчанию 3.0 — разумный баланс между следованием prompt и качеством движения.</p>
+
+        <select name="model_id" required aria-label="Модель video-editing">
+            {% for model in models %}
+                <option value="{{ model.model_id.value }}"{% if selected_video_model_id and model.model_id.value == selected_video_model_id %} selected{% endif %}>{{ model.name }}</option>
+            {% endfor %}
+        </select>
+
         <textarea name="prompt_text" rows="4" placeholder="Общий prompt (необязательно)">{{ prompt_text or '' }}</textarea>
         <textarea name="operations_text" rows="6" placeholder="00:00|00:05|Сделать сцену темнее&#10;01:10|01:25|Сделать надпись красной">{{ operations_text or '' }}</textarea>
         <input type="file" name="file" accept="video/*" required>

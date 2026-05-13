@@ -36,6 +36,13 @@ class ProcessingJobRepositoryImpl(SQLAlchemyRepository, ProcessingJobRepository)
             status=job.status,
             result_type=job.result_ref.result_type if job.result_ref else None,
             result_id=job.result_ref.result_id.value if job.result_ref else None,
+            video_output_width=job.video_output.width if job.video_output else None,
+            video_output_height=job.video_output.height if job.video_output else None,
+            video_output_fps=job.video_output.fps if job.video_output else None,
+            video_output_max_frames=job.video_output.max_frames if job.video_output else None,
+            video_output_guidance_scale=(
+                job.video_output.guidance_scale if job.video_output else None
+            ),
         )
         model.history = [
             JobHistoryRecordModel(
@@ -89,6 +96,11 @@ class ProcessingJobRepositoryImpl(SQLAlchemyRepository, ProcessingJobRepository)
         model.status = job.status
         model.result_type = job.result_ref.result_type if job.result_ref else None
         model.result_id = job.result_ref.result_id.value if job.result_ref else None
+        model.video_output_width = job.video_output.width if job.video_output else None
+        model.video_output_height = job.video_output.height if job.video_output else None
+        model.video_output_fps = job.video_output.fps if job.video_output else None
+        model.video_output_max_frames = job.video_output.max_frames if job.video_output else None
+        model.video_output_guidance_scale = job.video_output.guidance_scale if job.video_output else None
         model.history = [
             JobHistoryRecordModel(
                 status=record.status,

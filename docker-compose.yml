@@ -1,4 +1,24 @@
 services:
+  model-preload:
+    build:
+      context: .
+      dockerfile: app/Worker.Dockerfile
+    env_file:
+      - .env
+    environment:
+      HF_HOME: /models/hf
+      HF_HUB_CACHE: /models/hf/hub
+      HUGGINGFACE_HUB_CACHE: /models/hf/hub
+      TRANSFORMERS_CACHE: /models/hf/transformers
+      TORCH_HOME: /models/hf/torch
+      HF_TOKEN: ${HF_TOK}
+      PYTHONPATH: /workspace/src:/app/src
+    command: ["python", "/app/src/preload_models.py"]
+    volumes:
+      - ./app/src:/app/src
+      - ./src:/workspace/src
+      - hf_cache:/models/hf
+
   app:
     build:
       context: .
@@ -27,6 +47,11 @@ services:
       - .env
     environment:
       HF_HOME: /models/hf
+      HF_HUB_CACHE: /models/hf/hub
+      HUGGINGFACE_HUB_CACHE: /models/hf/hub
+      TRANSFORMERS_CACHE: /models/hf/transformers
+      TORCH_HOME: /models/hf/torch
+      HF_TOKEN: ${HF_TOK}
       MESSAGING_BACKEND: rabbitmq
       MEDIA_STORAGE_ROOT: /media
       RESULT_ARTIFACT_ROOT: /media/results
@@ -35,6 +60,14 @@ services:
       HF_DEVICE: cpu
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-grotesk}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-grotesk}
+      HF_VIDEO_NUM_INFERENCE_STEPS: "1"
+      HF_VIDEO_WIDTH: "320"
+      HF_VIDEO_HEIGHT: "192"
+      HF_VIDEO_FPS: "12"
+      HF_VIDEO_MAX_FRAMES: "9"
+      HF_VIDEO_GUIDANCE_SCALE: "3.0"
+      HF_VIDEO_TEMPORAL_ALIGN: "4"
+      HF_VIDEO_PROGRESS_INTERVAL_SEC: "10"
     command: ["python", "/app/src/worker.py"]
     volumes:
       - ./app/src:/app/src
@@ -42,8 +75,12 @@ services:
       - media_data:/media
       - hf_cache:/models/hf
     depends_on:
-      - rabbitmq
-      - database
+      model-preload:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_started
+      database:
+        condition: service_started
 
   web-proxy:
     build: ./web-proxy
@@ -67,6 +104,8 @@ services:
 
   database:
     image: postgres:16-alpine
+    ports:
+      - "127.0.0.1:${GROTESK_DB_PORT_PUBLISH:-5432}:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
