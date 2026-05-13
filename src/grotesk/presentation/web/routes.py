@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, FastAPI, File, Form, Request, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -25,7 +25,7 @@ from grotesk.domain.catalog.model import Capability, ModelId
 from grotesk.domain.common.primitives import Money
 from grotesk.domain.identity_access.model import UserId
 from grotesk.domain.media_ingestion.model import MediaType
-from grotesk.domain.processing.model import JobId, ProcessingStatus, TimelineOperation
+from grotesk.domain.processing.model import JobId, JobType, ProcessingStatus, TimelineOperation
 from grotesk.main.application import Application
 from grotesk.presentation.api.dependencies import (
     get_application,
@@ -36,6 +36,7 @@ from grotesk.presentation.api.dependencies import (
 from grotesk.presentation.api.routers.auth import get_password_hash, verify_password
 from grotesk.presentation.helpers import (
     build_book_transcript,
+    get_media_storage_root,
     load_json_artifact,
     probe_media_duration_seconds,
     register_uploaded_media,
@@ -109,6 +110,39 @@ def resolve_job_duration_label(source_storage_key: str | None, result: dict[str,
     if isinstance(result_duration, int | float):
         return format_duration_seconds(result_duration)
     return "—"
+
+
+def resolve_trusted_source_media_path(source_storage_key: str | None) -> Path | None:
+    if source_storage_key is None or not source_storage_key.strip():
+        return None
+    media_root = get_media_storage_root().resolve()
+    raw_path = Path(source_storage_key.strip())
+    candidate = raw_path if raw_path.is_absolute() else (media_root / raw_path)
+    try:
+        resolved = candidate.resolve()
+    except OSError:
+        return None
+    try:
+        resolved.relative_to(media_root)
+    except ValueError:
+        return None
+    if not resolved.is_file():
+        return None
+    return resolved
+
+
+def guess_audio_media_type(path: Path) -> str:
+    suffix = path.suffix.lower()
+    return {
+        ".wav": "audio/wav",
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".aac": "audio/aac",
+        ".flac": "audio/flac",
+        ".ogg": "audio/ogg",
+        ".opus": "audio/opus",
+        ".webm": "audio/webm",
+    }.get(suffix, "application/octet-stream")
 
 
 def filter_models_by_capability(models: list[ModelProfileDTO], capability: Capability) -> list[ModelProfileDTO]:
@@ -575,6 +609,12 @@ async def job_detail_page(
     status_stages = build_status_pipeline(job.status, job.history)
     auto_refresh = job.status in ACTIVE_JOB_STATUSES
     duration_label = resolve_job_duration_label(job.source_storage_key, result)
+    source_media_path = resolve_trusted_source_media_path(job.source_storage_key)
+    source_audio_url = (
+        f"/cabinet/jobs/{job.job_id.value}/source-audio"
+        if job.job_type == JobType.TRANSCRIPTION and source_media_path is not None
+        else None
+    )
     return templates.TemplateResponse(
         request=request,
         name="job_detail.html",
@@ -587,10 +627,38 @@ async def job_detail_page(
             book_transcript=build_book_transcript(result),
             operation_rows=build_operation_rows(job.operations),
             artifact_url=f"/jobs/{job.job_id.value}/artifact" if artifact_path is not None else None,
+            source_audio_url=source_audio_url,
             status_stages=status_stages,
             auto_refresh=auto_refresh,
             can_cancel=job.status in ACTIVE_JOB_STATUSES,
         ),
+    )
+
+
+@router.get("/cabinet/jobs/{job_id}/source-audio")
+async def job_source_audio(
+    job_id: UUID,
+    application: Annotated[Application, Depends(get_application)],
+    current_user: Annotated[UserDTO | None, Depends(get_optional_current_user)],
+) -> FileResponse:
+    if current_user is None:
+        return redirect("/login")
+    try:
+        job = await application.get_user_job_detail(
+            GetUserJobDetails(user_id=current_user.user_id, job_id=JobId(job_id))
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    if job.job_type != JobType.TRANSCRIPTION:
+        raise HTTPException(status_code=404, detail="Source audio is only available for transcription jobs.")
+    source_path = resolve_trusted_source_media_path(job.source_storage_key)
+    if source_path is None:
+        raise HTTPException(status_code=404, detail="Source media file not found.")
+    download_name = job.source_filename or source_path.name
+    return FileResponse(
+        path=source_path,
+        filename=download_name,
+        media_type=guess_audio_media_type(source_path),
     )
 
 
