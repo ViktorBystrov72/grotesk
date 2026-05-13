@@ -16,6 +16,15 @@
     <p><strong>Длительность:</strong> {{ duration_label }}</p>
     <p><strong>Время:</strong> {{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") if job.created_at else '' }}</p>
     <p><strong>Модель:</strong> {{ (result.model_name if result and result.model_name else job.model_name) or '—' }}</p>
+    {% if job.video_output %}
+        <p>
+            <strong>Параметры выходного видео:</strong>
+            {{ job.video_output.width }}×{{ job.video_output.height }} px,
+            {{ job.video_output.fps }} FPS,
+            до {{ job.video_output.max_frames }} кадров,
+            guidance {{ job.video_output.guidance_scale }}
+        </p>
+    {% endif %}
     <div class="status-line">
         <strong>Текущий статус:</strong>
         <span class="status-pill status-pill--{{ job.status.value }}">{{ format_processing_status(job.status) }}</span>
@@ -187,6 +196,35 @@
         {% endfor %}
     </ol>
 </div>
+
+{% if job.job_type.value == 'video_editing' %}
+<div class="card job-video-preview">
+    <h2>Видео</h2>
+    <p class="form-help-text">После генерации результат доступен ниже и по ссылке «Скачать артефакт» сверху.</p>
+    <div class="job-video-preview__grid">
+        <div class="job-video-preview__block">
+            <h3 class="job-video-preview__subtitle">Исходное видео</h3>
+            {% if source_video_url %}
+            <video class="job-preview-video" controls playsinline preload="metadata" src="{{ source_video_url }}">
+                Ваш браузер не поддерживает встроенное воспроизведение видео.
+            </video>
+            {% else %}
+            <p class="job-video-preview__muted">Файл исходного видео недоступен.</p>
+            {% endif %}
+        </div>
+        <div class="job-video-preview__block">
+            <h3 class="job-video-preview__subtitle">Результат</h3>
+            {% if result_video_url %}
+            <video class="job-preview-video" controls playsinline preload="metadata" src="{{ result_video_url }}">
+                Ваш браузер не поддерживает встроенное воспроизведение видео.
+            </video>
+            {% else %}
+            <p class="job-video-preview__muted">Появится после успешного завершения задачи.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% if source_audio_url %}
 <div class="card">

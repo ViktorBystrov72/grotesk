@@ -26,6 +26,7 @@ from grotesk.domain.common.primitives import Money
 from grotesk.domain.identity_access.model import UserId
 from grotesk.domain.media_ingestion.model import MediaType
 from grotesk.domain.processing.model import JobId, JobType, ProcessingStatus, TimelineOperation
+from grotesk.infrastructure.ml.config import MLConfig
 from grotesk.main.application import Application
 from grotesk.presentation.api.dependencies import (
     get_application,
@@ -44,6 +45,7 @@ from grotesk.presentation.helpers import (
 )
 from grotesk.presentation.web.job_statuses import build_status_pipeline
 from grotesk.presentation.web.status_labels import format_processing_status, format_transaction_type
+from grotesk.presentation.web.video_editing_form import parse_video_output_from_form, video_editing_page_context
 
 router = APIRouter(include_in_schema=False)
 BASE_DIR = Path(__file__).resolve().parent
@@ -145,8 +147,33 @@ def guess_audio_media_type(path: Path) -> str:
     }.get(suffix, "application/octet-stream")
 
 
+def guess_video_media_type(path: Path) -> str:
+    suffix = path.suffix.lower()
+    return {
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".mov": "video/quicktime",
+        ".mkv": "video/x-matroska",
+        ".avi": "video/x-msvideo",
+    }.get(suffix, "application/octet-stream")
+
+
 def filter_models_by_capability(models: list[ModelProfileDTO], capability: Capability) -> list[ModelProfileDTO]:
     return [model for model in models if capability in model.capabilities]
+
+
+def resolve_video_editing_selected_model_id(
+    video_models: list[ModelProfileDTO],
+    *,
+    preferred_catalog_name: str,
+    submitted_model_id: UUID | None = None,
+) -> UUID | None:
+    if submitted_model_id is not None and any(m.model_id.value == submitted_model_id for m in video_models):
+        return submitted_model_id
+    for model in video_models:
+        if model.name == preferred_catalog_name:
+            return model.model_id.value
+    return video_models[0].model_id.value if video_models else None
 
 
 def parse_time_value(raw_value: str) -> int:
@@ -481,13 +508,21 @@ async def video_editing_page(
     if current_user is None:
         return redirect("/login")
     models = await application.get_available_models(GetAvailableModels())
+    video_models = filter_models_by_capability(models, Capability.VIDEO_EDITING)
+    ml = MLConfig.from_env()
+    selected_model_id = resolve_video_editing_selected_model_id(
+        video_models,
+        preferred_catalog_name=ml.video_model_id,
+    )
     return templates.TemplateResponse(
         request=request,
         name="video_editing.html",
         context=template_context(
             request,
             current_user,
-            models=filter_models_by_capability(models, Capability.VIDEO_EDITING),
+            models=video_models,
+            selected_video_model_id=selected_model_id,
+            **video_editing_page_context(ml),
         ),
     )
 
@@ -499,12 +534,55 @@ async def video_editing_submit(
     file: Annotated[UploadFile, File(...)],
     application: Annotated[Application, Depends(get_application)],
     current_user: Annotated[UserDTO | None, Depends(get_optional_current_user)],
+    video_width: Annotated[str, Form(...)],
+    video_height: Annotated[str, Form(...)],
+    video_fps: Annotated[str, Form(...)],
+    video_max_frames: Annotated[str, Form(...)],
+    video_guidance_scale: Annotated[str, Form(...)],
     prompt_text: Annotated[str, Form()] = "",
     operations_text: Annotated[str, Form()] = "",
 ):
     if current_user is None:
         return redirect("/login")
     models = await application.get_available_models(GetAvailableModels())
+    video_models = filter_models_by_capability(models, Capability.VIDEO_EDITING)
+    ml = MLConfig.from_env()
+    selected_model_id = resolve_video_editing_selected_model_id(
+        video_models,
+        preferred_catalog_name=ml.video_model_id,
+        submitted_model_id=model_id,
+    )
+    video_submitted = {
+        "video_width": video_width,
+        "video_height": video_height,
+        "video_fps": video_fps,
+        "video_max_frames": video_max_frames,
+        "video_guidance_scale": video_guidance_scale,
+    }
+    try:
+        video_output = parse_video_output_from_form(
+            video_width=video_width,
+            video_height=video_height,
+            video_fps=video_fps,
+            video_max_frames=video_max_frames,
+            video_guidance_scale=video_guidance_scale,
+        )
+    except ValueError as error:
+        return templates.TemplateResponse(
+            request=request,
+            name="video_editing.html",
+            context=template_context(
+                request,
+                current_user,
+                models=video_models,
+                selected_video_model_id=selected_model_id,
+                error=str(error),
+                prompt_text=prompt_text,
+                operations_text=operations_text,
+                **video_editing_page_context(ml, video_submitted),
+            ),
+            status_code=400,
+        )
     operations, operations_error = parse_operations_text(operations_text)
     if operations_error is not None:
         return templates.TemplateResponse(
@@ -513,10 +591,12 @@ async def video_editing_submit(
             context=template_context(
                 request,
                 current_user,
-                models=filter_models_by_capability(models, Capability.VIDEO_EDITING),
+                models=video_models,
+                selected_video_model_id=selected_model_id,
                 error=operations_error,
                 prompt_text=prompt_text,
                 operations_text=operations_text,
+                **video_editing_page_context(ml, video_submitted),
             ),
             status_code=400,
         )
@@ -527,10 +607,12 @@ async def video_editing_submit(
             context=template_context(
                 request,
                 current_user,
-                models=filter_models_by_capability(models, Capability.VIDEO_EDITING),
+                models=video_models,
+                selected_video_model_id=selected_model_id,
                 error="Укажите общий prompt или хотя бы одну операцию по времени.",
                 prompt_text=prompt_text,
                 operations_text=operations_text,
+                **video_editing_page_context(ml, video_submitted),
             ),
             status_code=400,
         )
@@ -550,6 +632,7 @@ async def video_editing_submit(
                 estimated_cost=Money(Decimal("50.0")),
                 prompt_text=prompt_text,
                 operations=operations,
+                video_output=video_output,
             )
         )
         return redirect(f"/cabinet/jobs/{job_id.value}")
@@ -560,10 +643,12 @@ async def video_editing_submit(
             context=template_context(
                 request,
                 current_user,
-                models=filter_models_by_capability(models, Capability.VIDEO_EDITING),
+                models=video_models,
+                selected_video_model_id=selected_model_id,
                 error=str(error),
                 prompt_text=prompt_text,
                 operations_text=operations_text,
+                **video_editing_page_context(ml, video_submitted),
             ),
             status_code=400,
         )
@@ -615,6 +700,16 @@ async def job_detail_page(
         if job.job_type == JobType.TRANSCRIPTION and source_media_path is not None
         else None
     )
+    source_video_url = (
+        f"/cabinet/jobs/{job.job_id.value}/source-video"
+        if job.job_type == JobType.VIDEO_EDITING and source_media_path is not None
+        else None
+    )
+    result_video_url = (
+        f"/jobs/{job.job_id.value}/artifact"
+        if artifact_path is not None and artifact_path.suffix.lower() == ".mp4"
+        else None
+    )
     return templates.TemplateResponse(
         request=request,
         name="job_detail.html",
@@ -628,6 +723,8 @@ async def job_detail_page(
             operation_rows=build_operation_rows(job.operations),
             artifact_url=f"/jobs/{job.job_id.value}/artifact" if artifact_path is not None else None,
             source_audio_url=source_audio_url,
+            source_video_url=source_video_url,
+            result_video_url=result_video_url,
             status_stages=status_stages,
             auto_refresh=auto_refresh,
             can_cancel=job.status in ACTIVE_JOB_STATUSES,
@@ -659,6 +756,33 @@ async def job_source_audio(
         path=source_path,
         filename=download_name,
         media_type=guess_audio_media_type(source_path),
+    )
+
+
+@router.get("/cabinet/jobs/{job_id}/source-video")
+async def job_source_video(
+    job_id: UUID,
+    application: Annotated[Application, Depends(get_application)],
+    current_user: Annotated[UserDTO | None, Depends(get_optional_current_user)],
+) -> FileResponse:
+    if current_user is None:
+        return redirect("/login")
+    try:
+        job = await application.get_user_job_detail(
+            GetUserJobDetails(user_id=current_user.user_id, job_id=JobId(job_id))
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    if job.job_type != JobType.VIDEO_EDITING:
+        raise HTTPException(status_code=404, detail="Source video is only available for video-editing jobs.")
+    source_path = resolve_trusted_source_media_path(job.source_storage_key)
+    if source_path is None:
+        raise HTTPException(status_code=404, detail="Source media file not found.")
+    download_name = job.source_filename or source_path.name
+    return FileResponse(
+        path=source_path,
+        filename=download_name,
+        media_type=guess_video_media_type(source_path),
     )
 
 

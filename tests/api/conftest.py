@@ -20,7 +20,9 @@ from grotesk.presentation.helpers import get_media_storage_root
 TEST_USER_ID = UserId(UUID("00000000-0000-0000-0000-000000000111"))
 TEST_JOB_ID = JobId(UUID("00000000-0000-0000-0000-000000000222"))
 TEST_ACTIVE_JOB_ID = JobId(UUID("00000000-0000-0000-0000-000000000223"))
+TEST_VIDEO_DETAIL_JOB_ID = JobId(UUID("00000000-0000-0000-0000-000000000555"))
 TEST_MODEL_ID = ModelId(UUID("00000000-0000-0000-0000-000000000333"))
+TEST_VIDEO_EDIT_MODEL_ID = ModelId(UUID("00000000-0000-0000-0000-000000000444"))
 TEST_PASSWORD_HASH = "test-password-hash"
 
 
@@ -35,6 +37,19 @@ def ensure_test_job_source_media_file() -> str:
 
 
 TEST_JOB_SOURCE_MEDIA_PATH = ensure_test_job_source_media_file()
+
+
+def ensure_test_video_job_source_media_file() -> str:
+    media_root = get_media_storage_root()
+    video_dir = media_root / "video"
+    video_dir.mkdir(parents=True, exist_ok=True)
+    path = video_dir / "test-job-source.mp4"
+    if not path.exists():
+        path.write_bytes(b"fake-mp4")
+    return str(path.resolve())
+
+
+TEST_VIDEO_JOB_SOURCE_MEDIA_PATH = ensure_test_video_job_source_media_file()
 
 
 class MockApplication:
@@ -104,7 +119,19 @@ class MockApplication:
                             currency="CREDIT",
                         )
                     ],
-                )
+                ),
+                ModelProfileDTO(
+                    model_id=TEST_VIDEO_EDIT_MODEL_ID,
+                    name="decart-ai/Lucy-Edit-Dev",
+                    capabilities=[Capability.VIDEO_EDITING, Capability.IMAGE_REPLACEMENT, Capability.BODY_RESHAPING],
+                    pricing_rules=[
+                        PricingRuleDTO(
+                            capability=Capability.VIDEO_EDITING,
+                            amount="10.00",
+                            currency="CREDIT",
+                        ),
+                    ],
+                ),
             ]
 
         if type_name == "GetUserTransactionHistory":
@@ -148,6 +175,23 @@ class MockApplication:
             ]
 
         if type_name == "GetUserJobDetails":
+            if command_or_query.job_id == TEST_VIDEO_DETAIL_JOB_ID:
+                return ProcessingJobDetailDTO(
+                    job_id=TEST_VIDEO_DETAIL_JOB_ID,
+                    job_type=JobType.VIDEO_EDITING,
+                    status=ProcessingStatus.COMPLETED,
+                    created_at=datetime.now(UTC),
+                    source_filename="clip.mp4",
+                    model_name="decart-ai/Lucy-Edit-Dev",
+                    prompt_text="test prompt",
+                    result_type="video_editing",
+                    result_id=UUID("00000000-0000-0000-0000-000000000666"),
+                    history=[
+                        JobHistoryItemDTO(status=ProcessingStatus.COMPLETED, message="done"),
+                    ],
+                    operations=[],
+                    source_storage_key=TEST_VIDEO_JOB_SOURCE_MEDIA_PATH,
+                )
             if command_or_query.job_id == TEST_ACTIVE_JOB_ID:
                 return ProcessingJobDetailDTO(
                     job_id=TEST_ACTIVE_JOB_ID,

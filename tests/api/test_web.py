@@ -11,8 +11,9 @@ from grotesk.domain.processing.model import JobId, JobType, ProcessingStatus
 from grotesk.presentation.api.dependencies import get_application
 from grotesk.presentation.api.main import create_app
 from grotesk.presentation.api.routers import auth
+from grotesk.presentation.api.routers import jobs as jobs_router_module
 from grotesk.presentation.web import routes
-from tests.api.conftest import TEST_ACTIVE_JOB_ID, MockApplication
+from tests.api.conftest import TEST_ACTIVE_JOB_ID, TEST_VIDEO_DETAIL_JOB_ID, MockApplication
 
 
 async def login(client) -> None:
@@ -342,6 +343,18 @@ async def test_video_editing_page_explains_timecode_formats(client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_video_editing_page_selects_decart_model_by_default(client, monkeypatch) -> None:
+    monkeypatch.delenv("HF_VIDEO_MODEL_ID", raising=False)
+    await login(client)
+    response = await client.get("/cabinet/video-editing")
+    assert response.status_code == 200
+    needle = b"00000000-0000-0000-0000-000000000444"
+    assert needle in response.content
+    pos = response.content.find(needle)
+    assert response.content[pos : pos + 200].find(b"selected") >= 0
+
+
+@pytest.mark.asyncio
 async def test_history_page_renders(client) -> None:
     await login(client)
 
@@ -397,6 +410,64 @@ async def test_job_source_audio_requires_login(client) -> None:
 
     assert response.status_code == 303
     assert response.headers["location"] == "/login"
+
+
+@pytest.mark.asyncio
+async def test_job_detail_page_shows_video_previews_after_progress(client, tmp_path, monkeypatch) -> None:
+    await login(client)
+    out_mp4 = tmp_path / "out.mp4"
+    out_mp4.write_bytes(b"fake-video")
+    monkeypatch.setattr(routes, "resolve_result_artifact_path", lambda *args, **kwargs: out_mp4)
+
+    response = await client.get(f"/cabinet/jobs/{TEST_VIDEO_DETAIL_JOB_ID.value}")
+
+    assert response.status_code == 200
+    assert "Видео".encode() in response.content
+    assert "Исходное видео".encode() in response.content
+    assert "Результат".encode() in response.content
+    assert response.content.lower().find(b"<video") >= 0
+    artifact_path = f"/jobs/{TEST_VIDEO_DETAIL_JOB_ID.value}/artifact".encode()
+    assert artifact_path in response.content
+
+
+@pytest.mark.asyncio
+async def test_job_source_video_requires_login(client) -> None:
+    response = await client.get(
+        f"/cabinet/jobs/{TEST_VIDEO_DETAIL_JOB_ID.value}/source-video",
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login"
+
+
+@pytest.mark.asyncio
+async def test_job_source_video_404_for_transcription_job(client) -> None:
+    await login(client)
+    response = await client.get("/cabinet/jobs/00000000-0000-0000-0000-000000000222/source-video")
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_job_source_video_streams_file_for_logged_user(client) -> None:
+    await login(client)
+    response = await client.get(f"/cabinet/jobs/{TEST_VIDEO_DETAIL_JOB_ID.value}/source-video")
+    assert response.status_code == 200
+    ct = response.headers.get("content-type", "")
+    assert ct.startswith("video/") or "application/octet-stream" in ct
+    assert response.content == b"fake-mp4"
+
+
+@pytest.mark.asyncio
+async def test_job_artifact_mp4_returns_video_media_type(client, tmp_path, monkeypatch) -> None:
+    await login(client)
+    out_mp4 = tmp_path / "result.mp4"
+    out_mp4.write_bytes(b"mp4binary")
+    monkeypatch.setattr(jobs_router_module, "resolve_result_artifact_path", lambda *args, **kwargs: out_mp4)
+
+    response = await client.get(f"/jobs/{TEST_VIDEO_DETAIL_JOB_ID.value}/artifact")
+
+    assert response.status_code == 200
+    assert response.headers.get("content-type", "").startswith("video/mp4")
 
 
 @pytest.mark.asyncio

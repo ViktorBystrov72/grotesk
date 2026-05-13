@@ -265,6 +265,11 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.video-output-params__heading {
+  font-size: 1.05rem;
+  margin: 20px 0 8px;
+}
+
 .form-help code,
 .job-operations__time code {
   background: #e8eef8;
@@ -592,6 +597,50 @@ summary.status-help-ico:focus {
   width: 100%;
   max-width: 100%;
   margin-top: 4px;
+}
+
+.job-video-preview__grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: start;
+  margin-top: 12px;
+}
+
+.job-video-preview__block {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+}
+
+.job-video-preview__subtitle {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.job-video-preview__muted {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.job-preview-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 3;
+  max-width: 100%;
+  border-radius: 8px;
+  background: #fff;
+  object-fit: cover;
+  vertical-align: middle;
+}
+
+.job-video-preview .form-help-text {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #6b7280;
 }
 
 .status-stepper {

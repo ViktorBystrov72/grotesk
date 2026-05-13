@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from grotesk.infrastructure.db.config import DBConfig
-from grotesk.infrastructure.db.init_data import initialize_database
+from grotesk.infrastructure.db.init_data import wait_for_database
 from grotesk.infrastructure.db.session import build_engine, build_session_factory
 from grotesk.presentation.api.main import create_app
 
@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     db_config = DBConfig.from_env()
     engine = build_engine(db_config)
     session_factory = build_session_factory(engine)
-    await initialize_database(engine, session_factory)
+    await wait_for_database(engine)
 
     app.state.session_factory = session_factory  # type: ignore
 

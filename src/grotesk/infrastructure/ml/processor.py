@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
@@ -58,12 +59,23 @@ class HuggingFaceJobProcessor:
 
         if job.job_type == JobType.VIDEO_EDITING:
             model_id = model_profile.name or self._config.video_model_id
+            video_cfg = self._config
+            if job.video_output is not None:
+                video_cfg = replace(
+                    self._config,
+                    video_width=job.video_output.width,
+                    video_height=job.video_output.height,
+                    video_fps=job.video_output.fps,
+                    video_max_frames=job.video_output.max_frames,
+                    video_guidance_scale=job.video_output.guidance_scale,
+                )
             video_result: VideoEditResult = await asyncio.to_thread(
                 self._video_pipeline.edit,
                 source_path,
                 model_id,
                 job.prompt_text,
                 job.operations,
+                video_config=video_cfg,
             )
             return JobExecutionResult(
                 result_type="video_editing",

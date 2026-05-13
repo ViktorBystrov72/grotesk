@@ -13,7 +13,14 @@ from grotesk.domain.catalog.model import ModelId, ModelProfile, PricingRule
 from grotesk.domain.common.primitives import EntityId, FileLocation, Money
 from grotesk.domain.identity_access.model import Credential, Email, PasswordHash, User, UserId
 from grotesk.domain.media_ingestion.model import AttachmentAsset, MediaAsset, MediaAssetId
-from grotesk.domain.processing.model import JobHistoryRecord, JobId, JobResultRef, ProcessingJob, TimelineOperation
+from grotesk.domain.processing.model import (
+    JobHistoryRecord,
+    JobId,
+    JobResultRef,
+    ProcessingJob,
+    TimelineOperation,
+    VideoEditJobOutput,
+)
 from grotesk.infrastructure.db.models.entities import (
     AccountBalanceModel,
     BillingTransactionModel,
@@ -123,6 +130,22 @@ def processing_job_to_domain(model: ProcessingJobModel) -> ProcessingJob:
 
     operations_payload = cast(list[dict[str, Any]], model.operations_payload or [])
 
+    video_output = None
+    if (
+        model.video_output_width is not None
+        and model.video_output_height is not None
+        and model.video_output_fps is not None
+        and model.video_output_max_frames is not None
+        and model.video_output_guidance_scale is not None
+    ):
+        video_output = VideoEditJobOutput(
+            width=model.video_output_width,
+            height=model.video_output_height,
+            fps=model.video_output_fps,
+            max_frames=model.video_output_max_frames,
+            guidance_scale=float(model.video_output_guidance_scale),
+        )
+
     return ProcessingJob(
         id=JobId(model.id),
         user_id=UserId(model.user_id),
@@ -146,4 +169,5 @@ def processing_job_to_domain(model: ProcessingJobModel) -> ProcessingJob:
             for operation in operations_payload
         ],
         history=[history_record_to_domain(record) for record in model.history],
+        video_output=video_output,
     )

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
-from grotesk.domain.processing.model import JobId, JobType, ProcessingStatus, TimelineOperation
+from grotesk.domain.processing.model import JobId, JobType, ProcessingStatus, TimelineOperation, VideoEditJobOutput
 
 
 @dataclass(frozen=True)
@@ -36,3 +36,4 @@ class ProcessingJobDetailDTO:
     history: list[JobHistoryItemDTO]
     operations: list[TimelineOperation] = field(default_factory=list)
     source_storage_key: str | None = None
+    video_output: VideoEditJobOutput | None = None

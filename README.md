@@ -436,6 +436,8 @@ docker compose up
 docker compose up -d
 ```
 
+Том hf_cache монтируется в model-preload и worker. Не используйте `docker compose ... down -v`, если не хотите сбросить кэш моделей HF.
+
 Остановка:
 
 ```bash
