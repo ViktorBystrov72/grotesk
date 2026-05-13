@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from grotesk.infrastructure.db.config import DBConfig
-from grotesk.infrastructure.db.init_data import initialize_database
+from grotesk.infrastructure.db.init_data import wait_for_database
 from grotesk.infrastructure.db.session import build_engine, build_session_factory
 from grotesk.infrastructure.messaging.config import MessagingConfig
 from grotesk.infrastructure.messaging.worker import ProcessingWorker
@@ -17,7 +17,7 @@ async def run_worker() -> None:
     engine = build_engine(db_config)
     session_factory = build_session_factory(engine)
 
-    await initialize_database(engine, session_factory)
+    await wait_for_database(engine)
 
     worker = ProcessingWorker(session_factory, messaging_config)
     await worker.run()

@@ -10,19 +10,14 @@ from grotesk.application.identity_access.commands import RegisterUser
 from grotesk.domain.catalog.model import Capability, ModelId, ModelProfile, PricingRule
 from grotesk.domain.common.primitives import Money
 from grotesk.domain.identity_access.model import Email, UserId, UserRole
-from grotesk.infrastructure.db.base import Base
+from grotesk.infrastructure.db.config import DBConfig
+from grotesk.infrastructure.db.migrations import run_migrations
 from grotesk.infrastructure.db.models.entities import ModelProfileModel
 from grotesk.infrastructure.db.repositories.billing import AccountBalanceRepositoryImpl
 from grotesk.infrastructure.db.repositories.catalog import ModelCatalogRepositoryImpl
 from grotesk.infrastructure.db.repositories.user import UserRepositoryImpl
-from grotesk.infrastructure.db.schema_compat import ensure_processing_jobs_video_columns
 from grotesk.infrastructure.ml.config import MLConfig
 from grotesk.main.bootstrap import build_application
-
-
-async def create_schema(engine: AsyncEngine) -> None:
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
 
 
 async def wait_for_database(engine: AsyncEngine, retries: int = 20, delay_seconds: float = 1.5) -> None:
@@ -116,6 +111,5 @@ async def seed_demo_data(session_factory: async_sessionmaker[AsyncSession]) -> N
 
 async def initialize_database(engine: AsyncEngine, session_factory: async_sessionmaker[AsyncSession]) -> None:
     await wait_for_database(engine)
-    await create_schema(engine)
-    await ensure_processing_jobs_video_columns(engine)
+    await run_migrations(DBConfig.from_url(str(engine.url), echo=engine.echo))
     await seed_demo_data(session_factory)

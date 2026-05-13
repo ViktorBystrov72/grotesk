@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest_asyncio
 
 from grotesk.infrastructure.db.config import DBConfig
-from grotesk.infrastructure.db.init_data import create_schema
+from grotesk.infrastructure.db.migrations import run_migrations
 from grotesk.infrastructure.db.session import build_engine, build_session_factory
 from tests.support import DBContext
 
@@ -28,7 +28,17 @@ async def db_context() -> AsyncIterator[DBContext]:
         ),
     )
     session_factory = build_session_factory(engine)
-    await create_schema(engine)
+    await run_migrations(
+        DBConfig(
+            driver="sqlite+aiosqlite",
+            host="",
+            port=0,
+            database=db_file.name,
+            user="",
+            password="",
+            echo=False,
+        )
+    )
 
     try:
         yield DBContext(engine=engine, session_factory=session_factory)

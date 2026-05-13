@@ -32,12 +32,40 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-grotesk}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-grotesk}
     volumes:
+      - ./alembic:/workspace/alembic
+      - ./alembic.ini:/workspace/alembic.ini
       - ./app/src:/app/src
       - ./src:/workspace/src
       - media_data:/media
     depends_on:
-      - rabbitmq
-      - database
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_started
+      database:
+        condition: service_healthy
+
+  migrate:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    env_file:
+      - .env
+    environment:
+      MEDIA_STORAGE_ROOT: /media
+      PYTHONPATH: /workspace/src:/app/src
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-grotesk}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-grotesk}
+    command: ["python", "-m", "grotesk.infrastructure.db.migrate"]
+    volumes:
+      - ./alembic:/workspace/alembic
+      - ./alembic.ini:/workspace/alembic.ini
+      - ./app/src:/app/src
+      - ./src:/workspace/src
+      - media_data:/media
+    depends_on:
+      database:
+        condition: service_healthy
 
   worker:
     build:
@@ -70,6 +98,8 @@ services:
       HF_VIDEO_PROGRESS_INTERVAL_SEC: "10"
     command: ["python", "/app/src/worker.py"]
     volumes:
+      - ./alembic:/workspace/alembic
+      - ./alembic.ini:/workspace/alembic.ini
       - ./app/src:/app/src
       - ./src:/workspace/src
       - media_data:/media
@@ -80,7 +110,9 @@ services:
       rabbitmq:
         condition: service_started
       database:
-        condition: service_started
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   web-proxy:
     build: ./web-proxy
@@ -110,6 +142,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
